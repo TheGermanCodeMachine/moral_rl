@@ -1,6 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 import numpy as np
 from envs.gym_wrapper import *
 

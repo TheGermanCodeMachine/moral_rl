@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 import envs.randomized_v3
 import envs.randomized_v2
 from pycolab import rendering

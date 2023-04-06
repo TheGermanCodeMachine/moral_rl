@@ -1,5 +1,8 @@
 from tqdm import tqdm
-from moral.ppo import PPO, TrajectoryDataset, update_policy
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 import torch
 from moral.airl import *
 from moral.active_learning import *
@@ -15,8 +18,6 @@ import tensorflow as tf
 from linear_regression import *
 import helper
 from copy import deepcopy
-
-print(sys.path)
 
 # Use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
