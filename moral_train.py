@@ -1,19 +1,22 @@
 from tqdm import tqdm
-from ppo import PPO, TrajectoryDataset, update_policy
+from moral.ppo import PPO, TrajectoryDataset, update_policy
 import torch
-from airl import *
-from active_learning import *
+from moral.airl import *
+from moral.active_learning import *
 import numpy as np
 import matplotlib.pyplot as plt
 from envs.gym_wrapper import *
-from preference_giver import *
+from moral.preference_giver import *
 from utils.evaluate_ppo import evaluate_ppo
 import wandb
 import argparse
+import sys
 
+print(sys.path)
 
 # Use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 
 if __name__ == '__main__':
@@ -31,7 +34,7 @@ if __name__ == '__main__':
         'batchsize_ppo': 12,
         'n_queries': 50,
         'preference_noise': 0,
-        'n_workers': 12,
+        'n_workers': 1,
         'lr_ppo': 3e-4,
         'entropy_reg': 0.25,
         'gamma': 0.999,
@@ -60,21 +63,21 @@ if __name__ == '__main__':
 
     # Expert 0
     discriminator_0 = Discriminator(state_shape=state_shape, in_channels=in_channels).to(device)
-    discriminator_0.load_state_dict(torch.load('../saved_models/discriminator_v3_[0,1,0,1].pt'))
+    discriminator_0.load_state_dict(torch.load('saved_models/discriminator_v3_[0,1,0,1].pt', map_location=torch.device('cpu')))
     ppo_0 = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
-    ppo_0.load_state_dict(torch.load('../saved_models/ppo_airl_v3_[0,1,0,1].pt'))
+    ppo_0.load_state_dict(torch.load('saved_models/ppo_airl_v3_[0,1,0,1].pt', map_location=torch.device('cpu')))
     utop_0 = discriminator_0.estimate_utopia(ppo_0, config)
     print(f'Reward Normalization 0: {utop_0}')
     discriminator_0.set_eval()
 
     # Expert 1
-    discriminator_1 = Discriminator(state_shape=state_shape).to(device)
-    discriminator_1.load_state_dict(torch.load('../saved_models/discriminator_v3_[0,0,1,1].pt'))
-    ppo_1 = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
-    ppo_1.load_state_dict(torch.load('../saved_models/ppo_airl_v3_[0,0,1,1].pt'))
-    utop_1 = discriminator_1.estimate_utopia(ppo_1, config)
-    print(f'Reward Normalization 1: {utop_1}')
-    discriminator_1.set_eval()
+    # discriminator_1 = Discriminator(state_shape=state_shape).to(device)
+    # discriminator_1.load_state_dict(torch.load('saved_models/discriminator_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
+    # ppo_1 = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
+    # ppo_1.load_state_dict(torch.load('saved_models/ppo_airl_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
+    # utop_1 = discriminator_1.estimate_utopia(ppo_1, config)
+    # print(f'Reward Normalization 1: {utop_1}')
+    # discriminator_1.set_eval()
 
 
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)
@@ -84,7 +87,7 @@ if __name__ == '__main__':
     checkpoint_logs = []
 
     # Active Learning
-    preference_learner = PreferenceLearner(d=len(config.ratio), n_iter=10000, warmup=1000)
+    preference_learner = PreferenceLearner(d=3, n_iter=10000, warmup=1000)
     w_posterior = preference_learner.sample_w_prior(preference_learner.n_iter)
     w_posterior_mean = w_posterior.mean(axis=0)
     volume_buffer = VolumeBuffer()
@@ -143,11 +146,15 @@ if __name__ == '__main__':
         # Fetch AIRL rewards
         airl_state = torch.tensor(states).to(device).float()
         airl_next_state = torch.tensor(next_states).to(device).float()
+
+        
+
         airl_rewards_0 = discriminator_0.forward(airl_state, airl_next_state, config.gamma).squeeze(1)
-        airl_rewards_1 = discriminator_1.forward(airl_state, airl_next_state, config.gamma).squeeze(1)
+        # airl_rewards_1 = discriminator_1.forward(airl_state, airl_next_state, config.gamma).squeeze(1)
         airl_rewards_0 = airl_rewards_0.detach().cpu().numpy() * [0 if i else 1 for i in done]
-        airl_rewards_1 = airl_rewards_1.detach().cpu().numpy() * [0 if i else 1 for i in done]
-        vectorized_rewards = [[r[0], airl_rewards_0[i], airl_rewards_1[i]] for i, r in enumerate(rewards)]
+        # airl_rewards_1 = airl_rewards_1.detach().cpu().numpy() * [0 if i else 1 for i in done]
+        # vectorized_rewards = [[r[0], airl_rewards_0[i], airl_rewards_1[i]] for i, r in enumerate(rewards)]
+        vectorized_rewards = [[r[0], airl_rewards_0[i]] for i, r in enumerate(rewards)]
         scalarized_rewards = [np.dot(w_posterior_mean, r[0:3]) for r in vectorized_rewards]
 
         # v2-Environment

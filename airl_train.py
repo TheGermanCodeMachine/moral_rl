@@ -1,8 +1,8 @@
 from tqdm import tqdm
-from ppo import PPO, TrajectoryDataset, update_policy
+from moral.ppo import PPO, TrajectoryDataset, update_policy
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from envs.gym_wrapper import *
-from airl import *
+from moral.airl import *
 import torch
 import numpy as np
 import pickle
@@ -13,7 +13,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == '__main__':
     # Load demonstrations
-    expert_trajectories = pickle.load(open('../demonstrations/ppo_demos_v3_[0,1,0,1].pk', 'rb'))
+    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v3_[0,1,0,1].pk', 'rb'))
 
     # Init WandB & Parameters
     wandb.init(project='AIRL', config={
