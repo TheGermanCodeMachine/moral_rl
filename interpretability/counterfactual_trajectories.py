@@ -47,6 +47,21 @@ def accumulate_reward_over_traj(reward_function, trajectory):
         sum_reward += reward
     return sum_reward
 
+def extract_player_position(state):
+    return np.argwhere(state[0][1] == 1).squeeze(0)
+
+# tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
+def test_rejoined_org_traj(org_traj, state, step):
+    (x,y) = extract_player_position(state)
+    # ensure that the point of rejoining is not too far away in the future. This would otherwise make for unnatural rejoins. I consider 5 steps to be a reasonable limit
+    # TODO Experiment with different values for this limit
+    for t in range(step, min(len(org_traj['states']), step+6)):
+        # test whether position is the same
+        (x_org, y_org) = extract_player_position(org_traj['states'][t])
+        if x == x_org and y == y_org:
+            return t
+    return False
+
 
 if __name__ == '__main__':
 
@@ -142,6 +157,22 @@ if __name__ == '__main__':
             if done[0]:
                 next_states = vec_env_counter.reset()
                 break
+
+            # test if this next step will rejoin the orinigal trajectory
+            rejoin_step = test_rejoined_org_traj(org_traj, next_states, t)
+            # TODO I might have to add a test whether there has been enough difference between the two trajectories yet
+            if rejoin_step and rejoin_step < len(org_traj['states'])-1:
+                finish_org_states = org_traj['states'][rejoin_step:]
+                finish_org_actions = org_traj['actions'][rejoin_step:]
+                counterfactual_traj['states'].extend(finish_org_states)
+                counterfactual_traj['actions'].extend(finish_org_actions)
+                next_states = vec_env_counter.reset()
+                break
+
+
+            states = next_states.copy()
+            states_tensor = torch.tensor(states).float().to(device)
+
         counterfactual_trajs.append(counterfactual_traj)
         counterfactual_rewards.append(accumulate_reward_over_traj(discriminator, counterfactual_traj))
 
@@ -149,5 +180,6 @@ if __name__ == '__main__':
     max_diff = max(counterfactual_rewards, key=lambda x: abs(x-org_reward))
     # get the index of the max_diff
     max_diff_index = counterfactual_rewards.index(max_diff)
+    print("original reward: ", org_reward, "counterfactual reward: ", counterfactual_rewards[max_diff_index])
     # get the counterfactual trajectory with the largest absolute difference from the original reward
     max_diff_traj = counterfactual_trajs[max_diff_index]
