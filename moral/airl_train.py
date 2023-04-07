@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 from tqdm import tqdm
 from moral.ppo import PPO, TrajectoryDataset, update_policy
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -13,19 +17,23 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == '__main__':
     # Load demonstrations
-    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_[0,1].pk', 'rb'))
+    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_75_[0,1].pk', 'rb'))
 
-    # config 
-    class config:
-        env_id = 'randomized_v2'
-        env_steps = 3e6
-        batchsize_discriminator = 512
-        batchsize_ppo = 12
-        n_workers = 12
-        entropy_reg = 0
-        gamma = 0.999
-        epsilon = 0.1
-        ppo_epochs = 5
+
+
+    # Init WandB & Parameters
+    wandb.init(project='AIRL', config={
+        'env_id': 'randomized_v2',
+        'env_steps': 3e6,
+        'batchsize_discriminator': 512,
+        'batchsize_ppo': 12,
+        'n_workers': 12,
+        'entropy_reg': 0,
+        'gamma': 0.999,
+        'epsilon': 0.1,
+        'ppo_epochs': 5
+    })
+    config = wandb.config
 
     # Create Environment
     vec_env = SubprocVecEnv([make_env(config.env_id, i) for i in range(config.n_workers)])
@@ -49,7 +57,11 @@ if __name__ == '__main__':
     objective_logs = []
 
     for t in tqdm(range((int(config.env_steps/config.n_workers)))):
-
+        # at every 10% of the training process save a copy of the model
+        if t % (int(config.env_steps/config.n_workers)/10) == 0:
+            torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')
+            torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[0,1].pt')
+        
         # Act
         actions, log_probs = ppo.act(states_tensor)
         next_states, rewards, done, info = vec_env.step(actions)
@@ -71,7 +83,7 @@ if __name__ == '__main__':
             # Log Objectives
             objective_logs = np.array(objective_logs).sum(axis=0)
             for i in range(objective_logs.shape[1]):
-                print('Obj_' + str(i), objective_logs[:, i].mean())
+                wandb.log({'Obj_' + str(i): objective_logs[:, i].mean()})
             objective_logs = []
 
             # Update Models
@@ -85,11 +97,11 @@ if __name__ == '__main__':
                                                               batch_size=config.batchsize_discriminator)
 
             # Log Loss Statsitics
-            print('Discriminator Loss:', d_loss,
-                       '; Fake Accuracy:', fake_acc,
-                       '; Real Accuracy:', real_acc)
+            wandb.log({'Discriminator Loss': d_loss,
+                       'Fake Accuracy': fake_acc,
+                       'Real Accuracy': real_acc})
             for ret in dataset.log_returns():
-                print('Returns:', ret)
+                wandb.log({'Returns': ret})
             dataset.reset_trajectories()
 
         # Prepare state input for next time step
