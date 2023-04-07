@@ -1,0 +1,139 @@
+2023-04-07 14:41:26,418 INFO    MainThread:24360 [wandb_setup.py:_flush():76] Loading settings from C:\Users\janwe\.config\wandb\settings
+2023-04-07 14:41:26,418 INFO    MainThread:24360 [wandb_setup.py:_flush():76] Loading settings from C:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\wandb\settings
+2023-04-07 14:41:26,418 INFO    MainThread:24360 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2023-04-07 14:41:26,418 INFO    MainThread:24360 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'moral\\airl_train.py', 'program': 'c:\\Users\\janwe\\OneDrive\\Desktop\\Master_Thesis\\Other projects\\moral_rl\\moral\\airl_train.py'}
+2023-04-07 14:41:26,421 INFO    MainThread:24360 [wandb_init.py:_log_setup():428] Logging user logs to C:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\wandb\run-20230407_144126-yyupuf12\logs\debug.log
+2023-04-07 14:41:26,421 INFO    MainThread:24360 [wandb_init.py:_log_setup():429] Logging internal logs to C:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\wandb\run-20230407_144126-yyupuf12\logs\debug-internal.log
+2023-04-07 14:41:26,422 INFO    MainThread:24360 [wandb_init.py:init():462] calling init triggers
+2023-04-07 14:41:26,422 INFO    MainThread:24360 [wandb_init.py:init():465] wandb.init called with sweep_config: {}
+config: {'env_id': 'randomized_v2', 'env_steps': 3000000.0, 'batchsize_discriminator': 512, 'batchsize_ppo': 12, 'n_workers': 12, 'entropy_reg': 0, 'gamma': 0.999, 'epsilon': 0.1, 'ppo_epochs': 5}
+2023-04-07 14:41:26,422 INFO    MainThread:24360 [wandb_init.py:init():515] starting backend
+2023-04-07 14:41:26,422 INFO    MainThread:24360 [backend.py:_multiprocessing_setup():97] multiprocessing start_methods=spawn, using: spawn
+2023-04-07 14:41:26,436 INFO    MainThread:24360 [backend.py:ensure_launched():217] starting backend process...
+2023-04-07 14:41:26,627 INFO    MainThread:24360 [backend.py:ensure_launched():222] started backend process with pid: 28820
+2023-04-07 14:41:26,629 INFO    MainThread:24360 [wandb_init.py:init():525] backend started and connected
+2023-04-07 14:41:26,630 INFO    MainThread:24360 [wandb_init.py:init():596] updated telemetry
+2023-04-07 14:41:26,748 INFO    MainThread:24360 [wandb_init.py:init():627] communicating run to backend with 30 second timeout
+2023-04-07 14:41:30,181 INFO    MainThread:24360 [wandb_run.py:_on_init():1924] communicating current version
+2023-04-07 14:41:30,258 INFO    MainThread:24360 [wandb_run.py:_on_init():1928] got version response upgrade_message: "wandb version 0.14.1 is available!  To upgrade, please run:\n $ pip install wandb --upgrade"
+
+2023-04-07 14:41:30,258 INFO    MainThread:24360 [wandb_init.py:init():662] starting run threads in backend
+2023-04-07 14:41:31,145 INFO    MainThread:24360 [wandb_run.py:_console_start():1898] atexit reg
+2023-04-07 14:41:31,145 INFO    MainThread:24360 [wandb_run.py:_redirect():1771] redirect: SettingsConsole.WRAP
+2023-04-07 14:41:31,146 INFO    MainThread:24360 [wandb_run.py:_redirect():1808] Wrapping output streams.
+2023-04-07 14:41:31,147 INFO    MainThread:24360 [wandb_run.py:_redirect():1832] Redirects installed.
+2023-04-07 14:41:31,149 INFO    MainThread:24360 [wandb_init.py:init():688] run started, returning control to user process
+2023-04-07 18:23:33,928 INFO    MainThread:24360 [wandb_run.py:_atexit_cleanup():1867] got exitcode: 0
+2023-04-07 18:23:34,102 INFO    MainThread:24360 [wandb_run.py:_restore():1839] restore
+2023-04-07 18:23:34,658 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 863
+  total_bytes: 863
+}
+
+2023-04-07 18:23:34,775 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 863
+  total_bytes: 863
+}
+
+2023-04-07 18:23:34,982 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 863
+  total_bytes: 863
+}
+
+2023-04-07 18:23:35,096 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 863
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,206 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 863
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,314 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 6690
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,422 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,533 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,641 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,750 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:35,859 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:36,358 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+
+2023-04-07 18:23:36,773 INFO    MainThread:24360 [wandb_run.py:_on_finish():1996] got exit ret: done: true
+exit_result {
+}
+file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 12719
+  total_bytes: 12719
+}
+local_info {
+}
+
+2023-04-07 18:23:38,132 INFO    MainThread:24360 [wandb_run.py:_footer_history_summary_info():3104] rendering history
+2023-04-07 18:23:38,134 INFO    MainThread:24360 [wandb_run.py:_footer_history_summary_info():3136] rendering summary
+2023-04-07 18:23:38,161 INFO    MainThread:24360 [wandb_run.py:_footer_sync_info():3060] logging synced files

@@ -1,0 +1,1 @@
+{"Obj_0": 0.4000000000000001, "_timestamp": 1680884609, "_runtime": 13323, "_step": 50669, "Obj_1": 5.916666666666667, "Discriminator Loss": 0.40661001205444336, "Fake Accuracy": 0.91796875, "Real Accuracy": 0.640625, "Returns": -258.2215346097946, "_wandb": {"runtime": 13324}}
