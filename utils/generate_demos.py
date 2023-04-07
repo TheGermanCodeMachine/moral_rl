@@ -1,4 +1,8 @@
 from tqdm import tqdm
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 from moral.ppo import PPO
 import torch
 from envs.gym_wrapper import GymWrapper
@@ -8,11 +12,11 @@ import pickle
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 # Select Environment
-env_id = 'randomized_v3'
+env_id = 'randomized_v2'
 
 # Select n demos (need to set timer separately)
-n_demos = 1000
-max_steps = 50
+n_demos = 50
+max_steps = 75
 
 # Initialize Environment
 env = GymWrapper(env_id)
@@ -30,7 +34,7 @@ in_channels = obs_shape[-1]
 
 # Load Pretrained PPO
 ppo = PPO(state_shape=state_shape, n_actions=n_actions, in_channels=in_channels).to(device)
-ppo.load_state_dict(torch.load('../saved_models/ppo_v3_75_[0.0, 1.0, 0.0, 1.0].pt'))
+ppo.load_state_dict(torch.load('../saved_models/ppo_v2_[0,1].pt'))
 
 
 for t in tqdm(range((max_steps-1)*n_demos)):
@@ -49,4 +53,4 @@ for t in tqdm(range((max_steps-1)*n_demos)):
     states = next_states.copy()
     states_tensor = torch.tensor(states).float().to(device)
 
-pickle.dump(dataset, open('../demonstrations/ppo_demos_v3_75_[0,1,0,1]' + '.pk', 'wb'))
+pickle.dump(dataset, open('../demonstrations/ppo_demos_v2_75_[0,1]' + '.pk', 'wb'))

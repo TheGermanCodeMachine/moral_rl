@@ -44,6 +44,14 @@ class PPO(nn.Module):
         m = Categorical(action_probabilities)
         action = m.sample()
         return action.detach().cpu().numpy(), m.log_prob(action).detach().cpu().numpy()
+    
+    def pick_another_action(self, state, org_action):
+        action_probabilities, _ = self.forward(state)
+        m = Categorical(action_probabilities)
+        action = m.sample()
+        while action == org_action:
+            action = m.sample()
+        return action.detach().cpu().numpy(), m.log_prob(action).detach().cpu().numpy()
 
     def evaluate_trajectory(self, tau):
         trajectory_states = torch.tensor(tau['states']).float().to(device)

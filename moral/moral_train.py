@@ -1,4 +1,8 @@
 from tqdm import tqdm
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 from moral.ppo import PPO, TrajectoryDataset, update_policy
 import torch
 from moral.airl import *
@@ -11,8 +15,6 @@ from utils.evaluate_ppo import evaluate_ppo
 import wandb
 import argparse
 import sys
-
-print(sys.path)
 
 # Use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -27,21 +29,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Config
-    wandb.init(project='MORAL', config={
-        'env_id': 'randomized_v3',
-        'ratio': args.ratio,
-        'env_steps': 8e6,
-        'batchsize_ppo': 12,
-        'n_queries': 50,
-        'preference_noise': 0,
-        'n_workers': 1,
-        'lr_ppo': 3e-4,
-        'entropy_reg': 0.25,
-        'gamma': 0.999,
-        'epsilon': 0.1,
-        'ppo_epochs': 5
-    })
-    config = wandb.config
+    class config:
+        env_id = 'randomized_v3'
+        ratio = args.ratio
+        env_steps = 8e6
+        batchsize_ppo = 12
+        n_queries = 50
+        preference_noise = 0
+        n_workers = 1
+        lr_ppo = 3e-4
+        entropy_reg = 0.25
+        gamma = 0.999
+        epsilon = 0.1
+        ppo_epochs = 5
+
     env_steps = int(config.env_steps/config.n_workers)
     query_freq = int(env_steps/(config.n_queries+2))
 
@@ -71,13 +72,13 @@ if __name__ == '__main__':
     discriminator_0.set_eval()
 
     # Expert 1
-    # discriminator_1 = Discriminator(state_shape=state_shape).to(device)
-    # discriminator_1.load_state_dict(torch.load('saved_models/discriminator_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
-    # ppo_1 = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
-    # ppo_1.load_state_dict(torch.load('saved_models/ppo_airl_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
-    # utop_1 = discriminator_1.estimate_utopia(ppo_1, config)
-    # print(f'Reward Normalization 1: {utop_1}')
-    # discriminator_1.set_eval()
+    discriminator_1 = Discriminator(state_shape=state_shape).to(device)
+    discriminator_1.load_state_dict(torch.load('saved_models/discriminator_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
+    ppo_1 = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
+    ppo_1.load_state_dict(torch.load('saved_models/ppo_airl_v3_[0,0,1,1].pt', map_location=torch.device('cpu')))
+    utop_1 = discriminator_1.estimate_utopia(ppo_1, config)
+    print(f'Reward Normalization 1: {utop_1}')
+    discriminator_1.set_eval()
 
 
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)

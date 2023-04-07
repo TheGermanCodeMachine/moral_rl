@@ -1,0 +1,22 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.9.1",
+    "heartbeatAt": "2023-04-07T07:05:22.018586",
+    "startedAt": "2023-04-07T07:05:19.097395",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "c:\\Users\\janwe\\OneDrive\\Desktop\\Master_Thesis\\Other projects\\moral_rl\\moral\\ppo_train.py",
+    "codePath": "moral\\ppo_train.py",
+    "git": {
+        "remote": "https://github.com/TheGermanCodeMachine/moral_rl",
+        "commit": "90479d732e438a79a07c66dc82896231da70b11b"
+    },
+    "email": "janwehner1@t-online.de",
+    "root": "C:/Users/janwe/OneDrive/Desktop/Master_Thesis/Other projects/moral_rl",
+    "host": "LAPTOP-N3U8D05G",
+    "username": "janwe",
+    "executable": "C:\\Users\\janwe\\AppData\\Local\\Programs\\Python\\Python39\\python.exe"
+}

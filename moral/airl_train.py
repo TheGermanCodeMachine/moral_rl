@@ -13,21 +13,19 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 if __name__ == '__main__':
     # Load demonstrations
-    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v3_[0,1,0,1].pk', 'rb'))
+    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_[0,1].pk', 'rb'))
 
-    # Init WandB & Parameters
-    wandb.init(project='AIRL', config={
-        'env_id': 'randomized_v3',
-        'env_steps': 6e6,
-        'batchsize_discriminator': 512,
-        'batchsize_ppo': 12,
-        'n_workers': 12,
-        'entropy_reg': 0,
-        'gamma': 0.999,
-        'epsilon': 0.1,
-        'ppo_epochs': 5
-    })
-    config = wandb.config
+    # config 
+    class config:
+        env_id = 'randomized_v2'
+        env_steps = 3e6
+        batchsize_discriminator = 512
+        batchsize_ppo = 12
+        n_workers = 12
+        entropy_reg = 0
+        gamma = 0.999
+        epsilon = 0.1
+        ppo_epochs = 5
 
     # Create Environment
     vec_env = SubprocVecEnv([make_env(config.env_id, i) for i in range(config.n_workers)])
@@ -44,7 +42,7 @@ if __name__ == '__main__':
     ppo = PPO(state_shape=state_shape, n_actions=n_actions, in_channels=in_channels).to(device)
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
     optimizer = torch.optim.Adam(ppo.parameters(), lr=5e-4)
-    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=5e-5)
+    optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=5e-4)
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)
 
     # Logging
@@ -73,7 +71,7 @@ if __name__ == '__main__':
             # Log Objectives
             objective_logs = np.array(objective_logs).sum(axis=0)
             for i in range(objective_logs.shape[1]):
-                wandb.log({'Obj_' + str(i): objective_logs[:, i].mean()})
+                print('Obj_' + str(i), objective_logs[:, i].mean())
             objective_logs = []
 
             # Update Models
@@ -87,11 +85,11 @@ if __name__ == '__main__':
                                                               batch_size=config.batchsize_discriminator)
 
             # Log Loss Statsitics
-            wandb.log({'Discriminator Loss': d_loss,
-                       'Fake Accuracy': fake_acc,
-                       'Real Accuracy': real_acc})
+            print('Discriminator Loss:', d_loss,
+                       '; Fake Accuracy:', fake_acc,
+                       '; Real Accuracy:', real_acc)
             for ret in dataset.log_returns():
-                wandb.log({'Returns': ret})
+                print('Returns:', ret)
             dataset.reset_trajectories()
 
         # Prepare state input for next time step
@@ -99,4 +97,4 @@ if __name__ == '__main__':
         states_tensor = torch.tensor(states).float().to(device)
 
     vec_env.close()
-    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v3_[0,1,0,1].pt')
+    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')

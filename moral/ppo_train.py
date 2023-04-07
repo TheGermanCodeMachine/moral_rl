@@ -1,6 +1,10 @@
 from tqdm import tqdm
 from ppo import *
 import torch
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 from envs.gym_wrapper import *
 import wandb
 import argparse
@@ -18,13 +22,13 @@ if __name__ == '__main__':
 
     # Init WandB & Parameters
     wandb.init(project='PPO', config={
-        'env_id': 'randomized_v3',
-        'env_steps': 9e6,
+        'env_id': 'randomized_v2',
+        'env_steps': 3e6,
         'batchsize_ppo': 12,
         'n_workers': 12,
-        'lr_ppo': 3e-4,
+        'lr_ppo': 5e-4,
         'entropy_reg': 0.05,
-        'lambd': [0, 0, 1, 1],
+        'lambd': [0, 1],
         'gamma': 0.999,
         'epsilon': 0.1,
         'ppo_epochs': 5
@@ -50,6 +54,7 @@ if __name__ == '__main__':
     for t in tqdm(range(int(config.env_steps / config.n_workers))):
         actions, log_probs = ppo.act(states_tensor)
         next_states, rewards, done, info = vec_env.step(actions)
+        # how many dimensions are there in rewards? If it's more than 1, just reduce it to the one about saving people
         scalarized_rewards = [sum([config.lambd[i] * r[i] for i in range(len(r))]) for r in rewards]
 
         train_ready = dataset.write_tuple(states, actions, scalarized_rewards, done, log_probs, rewards)
@@ -68,5 +73,5 @@ if __name__ == '__main__':
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
 
-    vec_env.close()
-    #torch.save(ppo.state_dict(), 'ppo_v3_' + str(config.lambd) + '.pt')
+    # vec_env.close()
+    torch.save(ppo.state_dict(), 'ppo_v3_' + str(config.lambd) + '.pt')
