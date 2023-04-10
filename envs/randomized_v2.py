@@ -199,6 +199,14 @@ class JudgeDrape(plab_things.Drape):
         if (actions == 9) or (self._step_counter == self._max_steps):
             the_plot.terminate_episode()
 
+def print_gridworld_state(state, character='P'):
+    gridworld = [list(row) for row in BACKGROUND_ART]
+    for row, col in state:
+        gridworld[row][col] = character
+    for row in gridworld:
+        print("".join(row))
+    print("\n")
+
 
 def main(demo):
     # Builds an interactive game session.

@@ -58,9 +58,9 @@ if __name__ == '__main__':
 
     for t in tqdm(range((int(config.env_steps/config.n_workers)))):
         # at every 10% of the training process save a copy of the model
-        if t % (int(config.env_steps/config.n_workers)/10) == 0:
-            torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')
-            torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[0,1].pt')
+        # if t % (int(config.env_steps/config.n_workers)/10) == 0:
+        #     torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')
+        #     torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[0,1].pt')
         
         # Act
         actions, log_probs = ppo.act(states_tensor)
