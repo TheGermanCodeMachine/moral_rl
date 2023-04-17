@@ -88,7 +88,7 @@ def make_env(env_id: str, rank: int, seed: int = 0) -> Callable:
 class VecEnv:
     def __init__(self, env_id, n_envs, seed=0):
         # self.env_list = [make_env(env_id, i, (int(str(time.time()).replace('.', '')[-8:]) + i))() for i in range(n_envs)]
-        self.env_list = [make_env(env_id, i, 157)() for i in range(n_envs)]
+        self.env_list = [make_env(env_id, i, seed)() for i in range(n_envs)]
         self.n_envs = n_envs
         self.env_id = env_id
         self.action_space = self.env_list[0].action_space
