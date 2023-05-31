@@ -11,6 +11,28 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false
+        },
+
+        {
+            "name": "contrastive_learning",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/evaluation/train_mimic.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+        },
+
+        
+        {
+            "name": "non_contrastive_learning",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/evaluation/train_mimic.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "nc",
+            ]
         }
     ]
 }

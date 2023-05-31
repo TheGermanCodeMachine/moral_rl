@@ -94,7 +94,7 @@ def paint_state(state):
         formatted_fields = [f"{TYPE_TO_STRING[field]['color']}{TYPE_TO_STRING[field]['letter']}{Style.RESET_ALL}" for field in fields]
         print("".join(formatted_fields))
 
-def paint_two_states(org_state, cf_state, org_action, cf_action):
+def paint_two_states(org_state, cf_state, org_action=[0], cf_action=[0]):
     # get the size of the 3rd and 4th dimension of the tensor state
     org_state = org_state
     cf_state = cf_state
@@ -137,10 +137,10 @@ def visualize_two_trajectories(org_traj, cf_traj):
         print('Reward this step - orginial: {} -counterfactual: {}'.format(org_traj['rewards'][i], cf_traj['rewards'][i]))
         print('Total reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'])/len(org_traj['rewards']), sum(cf_traj['rewards'])/len(cf_traj['rewards'])))
         print('Original Trajectory Counterfactual Trajectory')
-        if i>0:
-            paint_two_states(org_traj['states'][i], cf_traj['states'][i], org_traj['actions'][i-1], cf_traj['actions'][i-1])
+        if i == 0:
+            paint_two_states(org_traj['states'][i], cf_traj['states'][i])
         else:
-            paint_two_states(org_traj['states'][i], cf_traj['states'][i], [0], [0])
+            paint_two_states(org_traj['states'][i], cf_traj['states'][i], org_traj['actions'][i-1], cf_traj['actions'][i-1])    
         # delay the next step for 0.5 seconds
         # time.sleep(0.5)
         # wait for user to press any key
@@ -164,7 +164,7 @@ def visualize_two_part_trajectories(org_traj, cf_traj, start_part, end_part_cf, 
     #     # delay the next step for 0.5 seconds
     #     time.sleep(0.5)
     #     # wait for user to press any key
-    #     # print("Press the any key for the next step...")
+    #     # print("Press the any key for thed next step...")
     #     # keyboard.read_event()
     #     # time.sleep(0.2)
 
@@ -172,20 +172,19 @@ def visualize_two_part_trajectories(org_traj, cf_traj, start_part, end_part_cf, 
     # choose the longer trajectory to iterate over
     end_part = max(end_part_cf, end_part_org)
 
-
-    for i in range(start_part-1, end_part+1):
-        i_cf = min(i, end_part_cf+1)
-        i_org = min(i, end_part_org+1)
+    for i in range(start_part, end_part+1):
+        i_cf = min(i, end_part_cf)
+        i_org = min(i, end_part_org)
         print('\033c')
         print('Step: {}'.format(i))
         # print the steps and rewards in one line
         print('Reward this step - orginial: {} -counterfactual: {}'.format(org_traj['rewards'][i_org], cf_traj['rewards'][i_cf]))
-        print('Total reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'][start_part:end_part_org+1])/(end_part_org+1-start_part), sum(cf_traj['rewards'][start_part:end_part_org+1])/(end_part_org+1-start_part)))
+        print('Total reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'][start_part:end_part_org+1])/(end_part_org+1-start_part), sum(cf_traj['rewards'][start_part:end_part_cf+1])/(end_part_cf+1-start_part)))
         print('Original Trajectory      Counterfactual Trajectory')
-        if i>0:
-            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf], org_traj['actions'][i_org-1], cf_traj['actions'][i_cf-1])
+        if i == start_part:
+            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf])
         else:
-            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf], [0], [0])
+            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf], org_traj['actions'][i_org-1], cf_traj['actions'][i_cf-1])
         # wait for user to press any key
         print("Press the any key for the next step...")
         keyboard.read_event()

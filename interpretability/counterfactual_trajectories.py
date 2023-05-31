@@ -24,9 +24,25 @@ from utils.visualize_trajectory import visualize_two_trajectories, visualize_two
 from utils.util_functions import *
 import random 
 import time
+from quality_metrics.quality_metrics import measure_quality
+from quality_metrics.diversity_measures import diversity_all
+from quality_metrics.validity_measures import validity_all as validity
+from quality_metrics.critical_state_measures import critical_state_all as critical_state
+from quality_metrics.distance_measures import distance_all as distance_all
+from copy import deepcopy
+import pickle
+import evaluation.extract_reward_features as erf
 
 # Use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+parser = argparse.ArgumentParser(description='Preference Ratio.')
+parser.add_argument('--d', type=int)
+args = parser.parse_args()
+
+if args.d == 1:
+    from quality_metrics.distance_measures import deciation_count as distance
+else:
+    from quality_metrics.distance_measures import my_distance as distance
 
 class config:
     env_id= 'randomized_v2'
@@ -40,41 +56,23 @@ class config:
     gamma= 0.999
     epsilon= 0.1
     ppo_epochs= 5
-    max_steps = 50
-
-def accumulate_reward_over_traj(reward_function, trajectory):
-    # there is probably some more efficient vectorised way to do this
-    sum_reward = 0
-    for t in range(len(trajectory['states'])):
-        state = trajectory['states'][t]
-        reward = reward_function.g(state)
-        sum_reward += reward
-    return sum_reward
+    max_steps = 75
+    num_runs = 1000
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
-def test_rejoined_org_traj(org_traj, state, step):
-    (x,y) = extract_player_position(state)
-    # ensure that the point of rejoining is not too far away in the future. This would otherwise make for unnatural rejoins. I consider 5 steps to be a reasonable limit
-    # TODO Experiment with different values for this limit
-    for t in range(step, min(len(org_traj['states']), step+6)):
-        # test whether position is the same
-        (x_org, y_org) = extract_player_position(org_traj['states'][t])
-        if x == x_org and y == y_org:
-            return t
+def test_rejoined_org_traj(org_traj, state, step, start):
+    if step > start+1:
+        (x,y) = extract_player_position(state)
+        # ensure that the point of rejoining is not too far away in the future. This would otherwise make for unnatural rejoins. I consider 5 steps to be a reasonable limit
+        # TODO Experiment with different values for this limit
+        s = max(start+1, step-1)
+        e = min(len(org_traj['states']), step+2)
+        for t in range(s, e):
+            # test whether position is the same
+            (x_org, y_org) = extract_player_position(org_traj['states'][t])
+            if x == x_org and y == y_org:
+                return t
     return False
-
-def deviation_metric(org_traj, cf_traj):
-    # TODO: Implement this
-    return 0
-
-def quality_criterion(org_reward, org_traj, cf_traj, cf_reward):
-    # alpha determines how much to prioritise similarity of trajectories or difference in outputs
-    alpha = 1
-    # difference in reward
-    diff_reward = abs(org_reward - cf_reward)
-    # difference in trajectories
-    diff_traj = deviation_metric(org_traj, cf_traj)
-    return diff_reward + alpha*diff_traj
 
 def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
      # create one trajectory with ppo
@@ -123,24 +121,28 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
     counterfactual_trajs = []
     counterfactual_rewards = []
     counterfactual_deviations = []
-    # counterfactual_part takes the form: (start of partial trajectory, end of partial trajectory original, end of partial trajectory counterfactual)
-    counterfactual_part = []
+    # the timestep where the counterfactual diverges from the original trajectory and rejoins again
+    starts = []
+    end_orgs = []
+    end_cfs = []
+
+    # create a new environment to make the counterfactual trajectory in; this has the same seed as the original so the board is the same
+    vec_env_counter = VecEnv(config.env_id, config.n_workers, seed=seed_env)
+    states = vec_env_counter.reset()
+    states_tensor = torch.tensor(states).float().to(device)
 
     # this loop is over all timesteps in the original and each loop creates one counterfactual with the action at that timestep changed
-    for step in range(1, len(org_traj['actions'])):
+    for step in range(0, len(org_traj['actions'])-1):
+        if step == 9:
+            a = 0
         counterfactual_traj = {'states': [], 'actions': [], 'rewards': []}
         counterfactual_deviation = 0
-
-        # create a new environment to make the counterfactual trajectory in; this has the same seed as the original so the board is the same
-        vec_env_counter = VecEnv(config.env_id, config.n_workers, seed=seed_env)
-        states = vec_env_counter.reset()
-        states_tensor = torch.tensor(states).float().to(device)
         
         # follow the steps of the original trajectory until the point of divergence (called step here)
         counterfactual_traj, states_tensor = retrace_original(0, step, counterfactual_traj, org_traj, vec_env_counter, states_tensor, discriminator)
 
         # TODO: Make sure (through debugging) that the same state is not being saved twice here
-        states_tensor = torch.tensor(org_traj['states'][step]).float().to(device)
+        # states_tensor = torch.tensor(org_traj['states'][step]).float().to(device)
         counterfactual_traj['states'].append(states_tensor)
         reward = discriminator.g(states_tensor)[0][0].item()
         counterfactual_traj['rewards'].append(reward)
@@ -154,51 +156,70 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
         next_states, reward, done, info = vec_env_counter.step(counterfact_action)
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
-        
-        end_part_cf = config.max_steps
 
         # finish the counterfactual trajectory
-        for t in range(step+1, config.max_steps):
+        for t in range(step+1, config.max_steps-1):
+            # print("cf: ", t, " ", extract_player_position(states_tensor))
+            # print("org: ", t, " ", extract_player_position(org_traj['states'][t]))
             counterfactual_traj['states'].append(states_tensor)
             counterfactual_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
             actions, log_probs = ppo.act(states_tensor)
             counterfactual_traj['actions'].append(actions)
             counterfactual_deviation += 1
-            next_states, reward, done, info = vec_env_counter.step(actions)
-            if done[0]:
-                next_states = vec_env_counter.reset()
-                break
-
-            states = next_states.copy()
-            states_tensor = torch.tensor(states).float().to(device)
 
             # test if this next step will rejoin the original trajectory
-            rejoin_step = test_rejoined_org_traj(org_traj, states_tensor, t)
+            rejoin_step = test_rejoined_org_traj(org_traj, states_tensor, t, step)
             # TODO I might have to add a test whether there has been enough difference between the two trajectories yet
             if rejoin_step and rejoin_step < len(org_traj['states'])-1:
-                # finish the trajectory following the original actions
-
                 end_part_cf = t
+
+                # check if there is a difference in the reward between the counterfactual and the original
+                # if there is no difference, then the counterfactual is not informative 
+                # note: it can still be different due to taking different grabbing actions, but gets the same reward because discrminator.g only considers the state
 
                 # follow the steps of the original trajectory until the length of the original trajectory
                 counterfactual_traj, states_tensor = retrace_original(rejoin_step, len(org_traj['states']), counterfactual_traj, org_traj, vec_env_counter, states_tensor, discriminator)
                 break
-            
-        counterfactual_trajs.append(counterfactual_traj)
-        counterfactual_rewards.append(torch.mean(torch.tensor(counterfactual_traj['rewards'])))
-        counterfactual_deviations.append(counterfactual_deviation)
-        if not rejoin_step:
-            rejoin_step = config.max_steps
-        counterfactual_part.append((step, end_part_cf, rejoin_step))
 
-    return counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, counterfactual_part
+            next_states, reward, done, info = vec_env_counter.step(actions)
+            if done[0]:
+                next_states = vec_env_counter.reset()
+                break
+            states = next_states.copy()
+            states_tensor = torch.tensor(states).float().to(device)
+
+        if not rejoin_step:
+            rejoin_step = len(org_traj['states']) - 1
+            end_part_cf = len(counterfactual_traj['states']) - 1
+            
+        # if the rewards are the same, then the counterfactual is not informative and we don't include it
+        if np.mean(counterfactual_traj['rewards'][step:end_part_cf+1]) - np.mean(org_traj['rewards'][step:rejoin_step+1]) != 0:
+            counterfactual_trajs.append(counterfactual_traj)
+            counterfactual_rewards.append(torch.mean(torch.tensor(counterfactual_traj['rewards'])))
+            counterfactual_deviations.append(counterfactual_deviation)
+            starts.append(step)
+            end_orgs.append(rejoin_step)
+            end_cfs.append(end_part_cf)
+
+            part_traj = {'states' : counterfactual_traj['states'][step:end_part_cf+1],
+                    'actions': counterfactual_traj['actions'][step:end_part_cf+1],
+                    'rewards': counterfactual_traj['rewards'][step:end_part_cf+1]}
+            
+            if erf.citizens_saved(part_traj) < 0:
+                a=0
+        vec_env_counter = VecEnv(config.env_id, config.n_workers, seed=seed_env)
+        states = vec_env_counter.reset()
+        states_tensor = torch.tensor(states).float().to(device)
+
+
+    return counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs
 
 
 
 if __name__ == '__main__':
 
     # make a random number based on the time
-    random.seed(time.time())
+    random.seed(2)
     seed_env = random.randint(0, 100)
     torch.manual_seed(seed_env)
     np.random.seed(seed_env)
@@ -223,29 +244,70 @@ if __name__ == '__main__':
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
     discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[0,1].pt', map_location=torch.device('cpu')))
 
-    org_traj, org_reward = generate_original_trajectory(ppo, discriminator, vec_env, states_tensor)
+    all_org_trajs = []
+    all_cf_trajs = []
+    all_starts = []
+    all_end_orgs = []
+    all_end_cfs = []
+    all_part_orgs = []
+    all_part_cfs = []
+    all_full_orgs = []
 
-    # get the counterfactual trajectories
-    counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, counterfactual_part = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
-    
+    for runs in range(config.num_runs):
+        print("run: ", runs)
+        if runs == 4:
+            a=0
+        # reset the environment
+        seed_env = random.randint(0, 100)
+        vec_env = VecEnv(config.env_id, config.n_workers, seed=seed_env)
+        states = vec_env.reset()
+        states_tensor = torch.tensor(states).float().to(device)
+        
+        # generate the original trajectory
+        org_traj, org_reward = generate_original_trajectory(ppo, discriminator, vec_env, states_tensor)
 
-    # alpha determines how much to prioritise similarity of trajectories or difference in outputs
-    alpha = 0.1
-    # return the index of the counterfactual reward with the largest absolute difference from the original reward
-    # max_diff = max(range(1, len(counterfactual_rewards)), key=lambda x: quality_criterion(org_reward, org_traj, counterfactual_trajs[x], counterfactual_rewards[x]))
-    max_diff = max(counterfactual_rewards, key=lambda x: abs(x-org_reward) - alpha * counterfactual_deviations[counterfactual_rewards.index(x)])
+        # generate the counterfactual trajectories
+        counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
 
-    # get the index of the max_diff
-    max_diff_index = counterfactual_rewards.index(max_diff)
-    print("original reward: ", org_reward, "counterfactual reward: ", counterfactual_rewards[max_diff_index])
-    # get the counterfactual trajectory with the largest absolute difference from the original reward
-    max_diff_traj = counterfactual_trajs[max_diff_index]
+        # calculate the quality criteria for each counterfactual trajectory
+        qc_values = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+        # get the qc_values[0] with the highest qc_values[1]
+        qc_values.sort(key=lambda x: x[1], reverse=True)
+        max_qc_index = qc_values[0][0]
+        # get the counterfactual trajectory with the largest absolute difference from the original reward
+        best_counterfactual_trajectory = counterfactual_trajs[max_qc_index]
 
-    # print out the players path over the trajectory
-    # for i in range(len(counterfactual_trajs[1]['states'])):
-        # print player position
-        # print(extract_player_position(org_traj['states'][i]), extract_player_position(counterfactual_trajs[1]['states'][i]))
+        # visualize only the part of the trajectory that is different
+        # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_cfs[max_qc_index],  end_orgs[max_qc_index])
 
-    # visualize_two_trajectories(org_traj, max_diff_traj)
-    # unpack the tuple in the counterfactual_part when calling visualize_two_part_trajectories
-    visualize_two_part_trajectories(org_traj, max_diff_traj, *counterfactual_part[max_diff_index])
+        # add the original trajectory and the counterfactual trajectory to the list of all trajectories
+        all_org_trajs.append(org_traj)
+        all_cf_trajs.append(best_counterfactual_trajectory)
+        all_starts.append(starts[max_qc_index])
+        all_end_orgs.append(end_orgs[max_qc_index])
+        all_end_cfs.append(end_cfs[max_qc_index])
+
+        part_org = {'states' : org_traj['states'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
+                    'actions': org_traj['actions'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
+                    'rewards': org_traj['rewards'][starts[max_qc_index]:end_orgs[max_qc_index]+1]}
+        part_rewards = sum(part_org['rewards'])
+        all_part_orgs.append((part_org, part_rewards))
+
+        part_cf = {'states' : best_counterfactual_trajectory['states'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
+                    'actions': best_counterfactual_trajectory['actions'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
+                    'rewards': best_counterfactual_trajectory['rewards'][starts[max_qc_index]:end_cfs[max_qc_index]+1]}
+        part_rewards_cf = sum(part_cf['rewards'])
+        all_part_cfs.append((part_cf, part_rewards_cf))
+
+        full_rewards = sum(org_traj['rewards'])
+        all_full_orgs.append((org_traj, starts[max_qc_index], end_cfs[max_qc_index]+1 - starts[max_qc_index], full_rewards))
+
+
+
+    # save the trajectories
+    with open('.\evaluation\datasets\org_trajectories_10.pkl', 'wb') as f:
+        pickle.dump(all_part_orgs, f)
+    with open('.\evaluation\datasets\cf_trajectories_10.pkl', 'wb') as f:
+        pickle.dump(all_part_cfs, f)
+    with open('.\evaluation\datasets\\full_trajectories_10.pkl', 'wb') as f:
+        pickle.dump(all_full_orgs, f)

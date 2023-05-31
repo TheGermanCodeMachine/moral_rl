@@ -45,7 +45,13 @@ class PPO(nn.Module):
         action = m.sample()
         return action.detach().cpu().numpy(), m.log_prob(action).detach().cpu().numpy()
     
+    def entropy_action_distribution(self, state):
+        action_probabilities, _ = self.forward(state)
+        m = Categorical(action_probabilities)
+        return m.entropy().detach().cpu().numpy()
+
     def pick_another_action(self, state, org_action):
+        org_action = torch.tensor(org_action).to(device)
         action_probabilities, _ = self.forward(state)
         m = Categorical(action_probabilities)
         action = m.sample()
