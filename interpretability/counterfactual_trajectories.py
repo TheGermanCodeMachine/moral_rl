@@ -58,8 +58,7 @@ class config:
     ppo_epochs= 5
     max_steps = 75
     num_runs = 100
-    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
-    criteria = ['validity', 'proximity', 'diversity']
+    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -316,7 +315,7 @@ if __name__ == '__main__':
 
 
 
-    base_path = '.\evaluation\datasets\\100_ablations\pvd100'
+    base_path = '.\evaluation\datasets\\100_ablations\pvcd100'
     # save the trajectories
     with open(base_path + '\org_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_orgs, f)

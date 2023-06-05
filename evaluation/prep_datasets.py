@@ -112,7 +112,7 @@ def full_trajectories_to_features(path_full, base_path):
         pickle.dump(part_features2, f)
 
 if __name__ == '__main__':
-    base_path = 'evaluation\datasets\\100_ablations\\v100'
+    base_path = 'evaluation\datasets\\100_ablations\pvd100'
 
     path_org = base_path + '\org_trajectories.pkl'
     path_cf = base_path + '\cf_trajectories.pkl'

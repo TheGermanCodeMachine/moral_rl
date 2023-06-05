@@ -9,9 +9,9 @@ import random
 
 class hyperparameters:
     learning_rate = 1e-1
-    epochs_non_contrastive = 1000
-    epochs_contrastive = 200
-    number_of_seeds = 5
+    epochs_non_contrastive = 10000
+    epochs_contrastive = 3000
+    number_of_seeds = 50
     
 class config:    
     print_plot = True
