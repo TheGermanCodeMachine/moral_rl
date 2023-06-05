@@ -33,6 +33,11 @@ def part_trajectories_to_features(path_org, path_cf, base_path):
 
     cf_trajectories = [d[0] for d in cf_trajs]
     cf_rewards = [d[1] for d in cf_trajs]
+    # how many unique rewards are there in cf rewards?
+    print(len(org_rewards), len(set(org_rewards)))
+    print(len(cf_rewards), len(set(cf_rewards)))
+    
+
 
     # Extract features.
     org_features = extract_features(org_trajectories)
@@ -97,7 +102,7 @@ def full_trajectories_to_features(path_full, base_path):
         pickle.dump(part_features2, f)
 
 if __name__ == '__main__':
-    base_path = 'evaluation\datasets\pv1000'
+    base_path = 'evaluation\datasets\\100_ablations\pv100'
 
     path_org = base_path + '\org_trajectories.pkl'
     path_cf = base_path + '\cf_trajectories.pkl'

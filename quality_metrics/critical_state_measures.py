@@ -6,5 +6,5 @@ def policy_entropy(policy, state):
 def critical_state_all(policy, states):
     critical_states = []
     for state in states:
-        critical_states.append(policy_entropy(policy, state))
+        critical_states.append(policy_entropy(policy, state).item())
     return critical_states

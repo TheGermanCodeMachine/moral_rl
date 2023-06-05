@@ -24,7 +24,7 @@ from utils.visualize_trajectory import visualize_two_trajectories, visualize_two
 from utils.util_functions import *
 import random 
 import time
-from quality_metrics.quality_metrics import measure_quality
+from quality_metrics.quality_metrics import measure_quality, get_all_combinations_of_qc
 from quality_metrics.diversity_measures import diversity_all
 from quality_metrics.validity_measures import validity_all as validity
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
@@ -57,7 +57,9 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    num_runs = 1000
+    num_runs = 100
+    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    criteria = ['validity', 'proximity', 'diversity']
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -77,13 +79,20 @@ def test_rejoined_org_traj(org_traj, state, step, start):
 def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
      # create one trajectory with ppo
     org_traj = {'states': [], 'actions': [], 'rewards': []}
+    citizen_sum = 100
     for t in tqdm(range(config.max_steps-1)):
+        if t==6:
+            a=0
         actions, log_probs = ppo.act(states_tensor)
         next_states, reward, done, info = vec_env.step(actions)
         org_traj['states'].append(states_tensor)
         # Note: Actions currently append as arrays and not integers!
         org_traj['actions'].append(actions)
         org_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
+        sum = torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item()
+        if torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item() > citizen_sum:
+            a=0
+        citizen_sum = torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item()
 
         if done[0]:
             next_states = vec_env.reset()
@@ -201,12 +210,15 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
             end_orgs.append(rejoin_step)
             end_cfs.append(end_part_cf)
 
-            part_traj = {'states' : counterfactual_traj['states'][step:end_part_cf+1],
-                    'actions': counterfactual_traj['actions'][step:end_part_cf+1],
-                    'rewards': counterfactual_traj['rewards'][step:end_part_cf+1]}
+            ## This code tests whether the phenomenon of "standing on the citizen makes the citizens disappear" is present in the counterfactual trajectory
+            # part_traj = {'states' : counterfactual_traj['states'][step:end_part_cf+1],
+            #         'actions': counterfactual_traj['actions'][step:end_part_cf+1],
+            #         'rewards': counterfactual_traj['rewards'][step:end_part_cf+1]}
             
-            if erf.citizens_saved(part_traj) < 0:
-                a=0
+            # if erf.citizens_saved(part_traj) < 0:
+            #     print('start', torch.sum(part_traj['states'][0][0][2], dim=(0,1)))
+            #     print('end', torch.sum(part_traj['states'][-1][0][2], dim=(0,1)))
+            #     a=0
         vec_env_counter = VecEnv(config.env_id, config.n_workers, seed=seed_env)
         states = vec_env_counter.reset()
         states_tensor = torch.tensor(states).float().to(device)
@@ -219,8 +231,8 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
 if __name__ == '__main__':
 
     # make a random number based on the time
-    random.seed(2)
-    seed_env = random.randint(0, 100)
+    random.seed(3)
+    seed_env = random.randint(0, 100000)
     torch.manual_seed(seed_env)
     np.random.seed(seed_env)
     
@@ -255,10 +267,8 @@ if __name__ == '__main__':
 
     for runs in range(config.num_runs):
         print("run: ", runs)
-        if runs == 4:
-            a=0
         # reset the environment
-        seed_env = random.randint(0, 100)
+        seed_env = random.randint(0, 100000)
         vec_env = VecEnv(config.env_id, config.n_workers, seed=seed_env)
         states = vec_env.reset()
         states_tensor = torch.tensor(states).float().to(device)
@@ -270,9 +280,8 @@ if __name__ == '__main__':
         counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
 
         # calculate the quality criteria for each counterfactual trajectory
-        qc_values = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+        qc_values = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
         # get the qc_values[0] with the highest qc_values[1]
-        qc_values.sort(key=lambda x: x[1], reverse=True)
         max_qc_index = qc_values[0][0]
         # get the counterfactual trajectory with the largest absolute difference from the original reward
         best_counterfactual_trajectory = counterfactual_trajs[max_qc_index]
@@ -297,17 +306,21 @@ if __name__ == '__main__':
                     'actions': best_counterfactual_trajectory['actions'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
                     'rewards': best_counterfactual_trajectory['rewards'][starts[max_qc_index]:end_cfs[max_qc_index]+1]}
         part_rewards_cf = sum(part_cf['rewards'])
+        if part_rewards_cf in [x[1] for x in all_part_cfs]:
+            a=0
         all_part_cfs.append((part_cf, part_rewards_cf))
+
 
         full_rewards = sum(org_traj['rewards'])
         all_full_orgs.append((org_traj, starts[max_qc_index], end_cfs[max_qc_index]+1 - starts[max_qc_index], full_rewards))
 
 
 
+    base_path = '.\evaluation\datasets\\100_ablations\pvc100'
     # save the trajectories
-    with open('.\evaluation\datasets\org_trajectories_10.pkl', 'wb') as f:
+    with open(base_path + '\org_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_orgs, f)
-    with open('.\evaluation\datasets\cf_trajectories_10.pkl', 'wb') as f:
+    with open(base_path + '\cf_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_cfs, f)
-    with open('.\evaluation\datasets\\full_trajectories_10.pkl', 'wb') as f:
+    with open(base_path + '\\full_trajectories.pkl', 'wb') as f:
         pickle.dump(all_full_orgs, f)

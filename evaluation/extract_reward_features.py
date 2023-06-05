@@ -13,6 +13,20 @@ def citizens_saved(traj):
     return num_citizens_start - num_citizens_end
 
 
+# def citizens_saved2(traj):
+#     saved = 0
+#     for state in traj['states']:
+#         player_row, player_col = extract_player_position(state)
+#         if traj['actions'] == 5 and traj['states'][0][0][2][player_row-1, player_col]: # grab upward?
+#             saved += 1
+#         if traj['actions'] == 6 and self.curtain[(player_row+1, player_col)]: # grab downward?
+#             saved += 1
+#         if traj['actions'] == 7 and self.curtain[(player_row, player_col-1)]: # grab leftward?
+#             saved += 1
+#         if traj['actions'] == 8 and self.curtain[(player_row, player_col+1)]: # grab rightward?
+#             saved += 1
+#     return saved
+
 # def citizens_missed(traj):
 
 def length(traj):
