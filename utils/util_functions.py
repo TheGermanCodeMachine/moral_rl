@@ -41,3 +41,13 @@ def extract_citizens_positions(state):
     else:
         pos_tensor = np.argwhere(state[2] == 1).squeeze(0)
     return pos_tensor[0], pos_tensor[1]
+
+def normalise_values(values):
+    values = np.array(values)
+    # check if all values are 0
+    if np.all(values == 0):
+        return values.tolist()
+    mean = np.mean(values)
+    std = np.std(values)
+    normalised_values = ((values - mean) / std).tolist()
+    return  normalised_values

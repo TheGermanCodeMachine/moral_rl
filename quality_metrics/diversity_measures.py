@@ -5,7 +5,7 @@ sys.path.append(str(adjacent_folder))
 
 import numpy as np
 import torch
-from utils.util_functions import state_action_diff, distance_subtrajectories, extract_player_position
+from utils.util_functions import state_action_diff, distance_subtrajectories, extract_player_position, normalise_values
 from quality_metrics.distance_measures import my_distance
 
 ROTATED_TRAJ = None
@@ -22,19 +22,19 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     # calculate the diversity of the length of the trajectories and start and end times
     length_div = length_diversity(end_cf - start, [prev_ends_cf[x] - prev_starts[x] for x in iterate_prev])
     start_time_div = timestep_diversity(start, prev_starts)
-    end_time_div = timestep_diversity(end_cf, prev_ends_cf)
+    # end_time_div = timestep_diversity(end_cf, prev_ends_cf)
     
     # calculate the diversity of start and end states
 
     prev_first_states = [i['states'][0] for i in prev_org_traj]
     prev_first_actions = [i['actions'][0] for i in prev_org_traj]
     start_state_div = state_diversity(traj1["states"][start], traj1["actions"][start], prev_first_states, prev_first_actions)
-    prev_last_states = [i['states'][-1] for i in prev_org_traj]
-    prev_last_actions = [i['actions'][-1] for i in prev_org_traj]
-    end_state_div = state_diversity(traj1['states'][end_org], traj1['actions'][end_org], prev_last_states, prev_last_actions)
-    prev_last_cf_states = [i['states'][-1] for i in prev_cf_traj]
-    prev_last_cf_actions = [i['actions'][-1] for i in prev_cf_traj]
-    endcf_state_div = state_diversity(traj2['states'][end_cf], traj2['actions'][end_cf], prev_last_cf_states, prev_last_cf_actions)
+    # prev_last_states = [i['states'][-1] for i in prev_org_traj]
+    # prev_last_actions = [i['actions'][-1] for i in prev_org_traj]
+    # end_state_div = state_diversity(traj1['states'][end_org], traj1['actions'][end_org], prev_last_states, prev_last_actions)
+    # prev_last_cf_states = [i['states'][-1] for i in prev_cf_traj]
+    # prev_last_cf_actions = [i['actions'][-1] for i in prev_cf_traj]
+    # endcf_state_div = state_diversity(traj2['states'][end_cf], traj2['actions'][end_cf], prev_last_cf_states, prev_last_cf_actions)
 
 
     # This makes the code super inefficient because it causes thousands of calls to the state_action_diff function
@@ -43,8 +43,8 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     # trajectory_div_org = part_traj_diversity(part_traj1, all_rotated_trajs)
     # trajectory_div_cf = part_traj_diversity(part_traj2, all_rotated_trajs)
 
-    print("length_div: ", length_div, "start_time_div: ", start_time_div, "end_time_div: ", end_time_div, "start_state_div: ", start_state_div, "end_state_div: ", end_state_div, "endcf_state_div: ", endcf_state_div)
-    return length_div + start_time_div + end_time_div + start_state_div + end_state_div + endcf_state_div # + trajectory_div_org + trajectory_div_cf
+    # print("length_div: ", length_div, "start_time_div: ", start_time_div, "start_state_div: ", start_state_div)
+    return length_div, start_time_div, start_state_div # + trajectory_div_org + trajectory_div_cf
 
 def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_traj_orgs, prev_traj_cfs, prev_starts, prev_ends_cf, prev_ends_org):
     if len(prev_starts) == 0:
@@ -58,11 +58,18 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_traj_orgs,
     all_prev_traj = prev_org_traj.copy()
     all_prev_traj.extend(prev_cf_traj)
     all_rotated_trajs = [t for x in all_prev_traj for t in rotated_trajectories(x)]
-    diversity_measures = []
+    length_divs = []
+    start_time_divs = []
+    start_state_divs = []
     for x in range(len(end_cfs)):
-        div = diversity(org_traj, cf_trajs[x], starts[x], end_cfs[x], end_orgs[x], prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
-        diversity_measures.append(div)
-    return diversity_measures
+        length_div, start_time_div, start_state_div = diversity(org_traj, cf_trajs[x], starts[x], end_cfs[x], end_orgs[x], prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
+        length_divs.append(length_div)
+        start_time_divs.append(start_time_div)
+        start_state_divs.append(start_state_div)
+    length_divs = normalise_values(length_divs)
+    start_time_divs = normalise_values(start_time_divs)
+    start_state_divs = normalise_values(start_state_divs)
+    return length_divs + start_time_divs + start_state_divs
 
 def length_diversity(dev, prev_dev):
     # pick out the 3 values in prev_dev that are closest to dev

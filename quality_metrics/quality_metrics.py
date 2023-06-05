@@ -21,13 +21,6 @@ def print_prox_val(validity_qc, proximity_qc):
     # correlation between validity and proximity
     print("Correlation validity and proximity: ", np.corrcoef(validity_qc, proximity_qc))
 
-def normalise_values(values):
-    values = np.array(values)
-    mean = np.mean(values)
-    std = np.std(values)
-    normalised_values = ((values - mean) / std).tolist()
-    return  normalised_values
-
 
 #NOTE: currently i am only using proximity and validity
 def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, criteria_to_use):
