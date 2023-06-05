@@ -1,4 +1,9 @@
+import sys
+from pathlib import Path
+adjacent_folder = Path(__file__).parent.parent
+sys.path.append(str(adjacent_folder))
 import torch
+import os
 import pickle
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
@@ -6,18 +11,20 @@ from matplotlib import pyplot as plt
 from evaluate_mimic import evaluate_mimic
 import sys
 import random
+from utils.util_functions import iterate_through_folder
 
 class hyperparameters:
     learning_rate = 1e-1
     epochs_non_contrastive = 10000
     epochs_contrastive = 3000
-    number_of_seeds = 50
+    number_of_seeds = 5
     
 class config:    
-    print_plot = True
-    print_examples = True
-    print_weights = True
+    print_plot = False
+    print_examples = False
+    print_weights = False
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'bias']
+    save_results = True
 
 def train_test_split(org_trajs, cf_trajs, num_features, train_ratio=0.8):
     # randomise the order of the trajectories
@@ -76,11 +83,9 @@ def print_example_predictions(model, test_set, test_labels):
         for i in range(5):
             print('features', test_set[i], 'prediction', y_pred_test[i].item(), 'label', test_labels[i].item())
 
-def get_weights(model, print=False):
-    if not config.print_weights:
-        return
+def get_weights(model):
     weights = [model.weight[0][0].item(), model.weight[0][1].item(), model.weight[0][2].item(), model.weight[0][3].item(), model.weight[0][4].item(), model.bias[0].item()]
-    if print:
+    if config.print_weights:
         print('citizens_saved', model.weight[0][0].item())
         print('unsaved_citizens', model.weight[0][1].item())
         print('distance_to_citizen', model.weight[0][2].item())
@@ -143,7 +148,26 @@ def non_contrastive_learning(path_org, path_cf):
     print_example_predictions(model, test_set, test_labels)
     show_loss_plot(train_losses, test_losses)
 
-def learning_repeats(path_org, path_cf, contrastive=True):
+def contrastive_learning(path_org, path_cf):
+    org_features = pickle.load(open(path_org, 'rb'))
+    cf_features = pickle.load(open(path_cf, 'rb'))
+    num_features = len(org_features[0])-1
+
+    # put the datasets into the approriate format
+    train_set, train_labels, test_set, test_labels = train_test_split_contrastive(org_features, cf_features, num_features, train_ratio=0.6)
+
+    model, train_losses, test_losses = train_model(train_set, train_labels, test_set, test_labels, num_features, hyperparameters.epochs_contrastive)
+    
+    print('final train_loss', train_losses[-1])
+    print('final train mean error', torch.mean(torch.abs(model(train_set).squeeze() - train_labels)).item())
+
+    # test the model
+    evaluate_mimic(model, test_set, test_labels)
+    get_weights(model)
+    print_example_predictions(model, test_set, test_labels)
+    show_loss_plot(train_losses, test_losses)
+
+def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=True):
     org_features = pickle.load(open(path_org, 'rb'))
     cf_features = pickle.load(open(path_cf, 'rb'))
     num_features = len(org_features[0])-1
@@ -172,7 +196,7 @@ def learning_repeats(path_org, path_cf, contrastive=True):
         test_mean_errors.append(test_mean_error)
         pearson_correlations.append(pearson_correlation)
         spearman_correlations.append(spearman_correlation)
-        weights.append(get_weights(model, print=False))
+        weights.append(get_weights(model))
         train_lossess.append(train_losses[-1])
         all_train_losses.append(train_losses)
         all_test_losses.append(test_losses)
@@ -192,57 +216,52 @@ def learning_repeats(path_org, path_cf, contrastive=True):
     all_test_losses = np.mean(all_test_losses, axis=0)
     show_loss_plot(all_train_losses, all_test_losses)
 
-
-def contrastive_learning(path_org, path_cf):
-    org_features = pickle.load(open(path_org, 'rb'))
-    cf_features = pickle.load(open(path_cf, 'rb'))
-    num_features = len(org_features[0])-1
-
-    # put the datasets into the approriate format
-    train_set, train_labels, test_set, test_labels = train_test_split_contrastive(org_features, cf_features, num_features, train_ratio=0.6)
-
-    model, train_losses, test_losses = train_model(train_set, train_labels, test_set, test_labels, num_features, hyperparameters.epochs_contrastive)
-    
-    print('final train_loss', train_losses[-1])
-    print('final train mean error', torch.mean(torch.abs(model(train_set).squeeze() - train_labels)).item())
-
-    # test the model
-    evaluate_mimic(model, test_set, test_labels)
-    get_weights(model)
-    print_example_predictions(model, test_set, test_labels)
-    show_loss_plot(train_losses, test_losses)
-
-    
+    if config.save_results:
+        to_save = {'train_losses': train_lossess, 'test_losses': test_losses, 'test_mean_errors': test_mean_errors, 
+                   'train_mean_errors': train_mean_errors, 'pearson_correlations': pearson_correlations, 'spearman_correlations': spearman_correlations, 
+                   'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses}
+        
+        path = base_path + "\\results\\"
+        #  if the results folder does not exist, create it
+        print(os.path.dirname(path))
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        if contrastive:
+            path += "contrastive_learning"
+        else:
+            path += "non_contrastive_learning"
+        if baseline:
+            path += "_baseline.pkl"
+        else:
+            path += "_counterfactual.pkl"
+        with open(path, 'wb') as f:
+            pickle.dump(to_save, f)
 
 
 if __name__ == '__main__':
-    # read console arguments
-    # arg[1]: Learn in a contrastive way or not
-    # c or contrastive: use contrastive learning between original and counterfactual
-    # nc or non-contrastive: learn in a non-contrastive way
-    # arg[2]: Test the counterfactual trajectory generator or a baseline
-    # b or baseline: test the baseline model
-    # cf or counterfactual: test counterfactuals
+    folder_path = 'evaluation\datasets\\100_ablations\pv100'
 
-    # test if one of the args is a number and extract the number
-    
+    # if there is an argument in the console
+    if len(sys.argv) > 1:
+        folder_path = sys.argv[1]
 
-    
-    base_path = 'evaluation\datasets\\100_ablations\pv100'
-    path_org_cte = base_path + '\org_features.pkl'
-    path_cf_cte = base_path + '\cf_features.pkl'
-    path_org_baseline = base_path + '\org_features_baseline.pkl'
-    path_cf_baseline = base_path + '\cf_features_baseline.pkl'
+    all_folder_base_paths = iterate_through_folder(folder_path)
 
-    # contrastive learning
-    print('# BASELINE Contrastive Learning')
-    learning_repeats(path_org_baseline, path_cf_baseline, contrastive=True)
-    print('-------------------------')
-    print('# COUNTERFACTUAL Contrastive Learning')
-    learning_repeats(path_org_cte, path_cf_cte, contrastive=True)
-    print('-------------------------')
-    print('# BASELINE Non-Contrastive Learning')
-    learning_repeats(path_org_baseline, path_cf_baseline, contrastive=False)
-    print('-------------------------')
-    print('# COUNTERFACTUAL Non-Contrastive Learning')
-    learning_repeats(path_org_cte, path_cf_cte, contrastive=False)
+    for base_path in all_folder_base_paths:
+        path_org_cte = base_path + '\org_features.pkl'
+        path_cf_cte = base_path + '\cf_features.pkl'
+        path_org_baseline = base_path + '\org_features_baseline.pkl'
+        path_cf_baseline = base_path + '\cf_features_baseline.pkl'
+
+        # contrastive learning
+        print('# BASELINE Contrastive Learning')
+        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=True, baseline=True)
+        print('-------------------------')
+        print('# COUNTERFACTUAL Contrastive Learning')
+        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=False)
+        print('-------------------------')
+        print('# BASELINE Non-Contrastive Learning')
+        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=False, baseline=True)
+        print('-------------------------')
+        print('# COUNTERFACTUAL Non-Contrastive Learning')
+        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=False, baseline=False)

@@ -33,6 +33,19 @@
             "args": [
                 "nc",
             ]
+        },
+
+        
+        {
+            "name": "iterate_through_folders",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/evaluation/train_mimic.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "evaluation\\datasets\\100_ablations",
+            ]
         }
     ]
 }

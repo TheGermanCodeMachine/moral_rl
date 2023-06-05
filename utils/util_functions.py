@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 def extract_player_position(state):
     if len(state[0]==1):
@@ -51,3 +52,21 @@ def normalise_values(values):
     std = np.std(values)
     normalised_values = ((values - mean) / std).tolist()
     return  normalised_values
+
+def iterate_through_folder(folder_path):
+    # are there subfolders?
+    subfolders = [f.path for f in os.scandir(folder_path) if f.is_dir()]
+    # if there are subfolders, iterate through them
+    if subfolders:
+        all_folder_base_paths = []
+        for subfolder in subfolders:
+            # subfolder shouldn't be called results
+            if not subfolder.endswith('results'):
+                subsubfolders = iterate_through_folder(subfolder)
+                all_folder_base_paths.extend(subsubfolders)
+            else:
+                # in this case we have reached the relevant folder and don't want to go deeper
+                return [folder_path]
+        return all_folder_base_paths
+    else:
+        return [folder_path]
