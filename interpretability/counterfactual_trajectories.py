@@ -102,9 +102,7 @@ def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
 
-    # sum up the reward of the original trajectory
-    org_reward = torch.mean(torch.tensor(org_traj['rewards']))
-    return org_traj, org_reward
+    return org_traj
 
 def retrace_original(start, divergence, counterfactual_traj, org_traj, vec_env_counter, states_tensor, discriminator):
     # retrace the steps of original trajectory until the point of divergence
@@ -276,7 +274,7 @@ if __name__ == '__main__':
         states_tensor = torch.tensor(states).float().to(device)
         
         # generate the original trajectory
-        org_traj, org_reward = generate_original_trajectory(ppo, discriminator, vec_env, states_tensor)
+        org_traj = generate_original_trajectory(ppo, discriminator, vec_env, states_tensor)
 
         # generate the counterfactual trajectories
         counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
