@@ -32,17 +32,10 @@ from quality_metrics.distance_measures import distance_all as distance_all
 from copy import deepcopy
 import pickle
 import evaluation.extract_reward_features as erf
+from quality_metrics.distance_measures import my_distance as distance
 
 # Use GPU if available
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-parser = argparse.ArgumentParser(description='Preference Ratio.')
-parser.add_argument('--d', type=int)
-args = parser.parse_args()
-
-if args.d == 1:
-    from quality_metrics.distance_measures import deciation_count as distance
-else:
-    from quality_metrics.distance_measures import my_distance as distance
 
 class config:
     env_id= 'randomized_v2'
@@ -58,8 +51,17 @@ class config:
     ppo_epochs= 5
     max_steps = 75
     num_runs = 100
-    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
-    criteria = ['validity']
+    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    # criteria = ['validity']
+
+def parse_attributes(arg_str):
+    attr_map = {
+        'p': 'proximity',
+        'v': 'validity',
+        'c': 'critical_state',
+        'd': 'diversity',
+    }
+    return [attr_map[c] for c in arg_str if c in attr_map]
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -228,6 +230,14 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
 
 if __name__ == '__main__':
 
+    # Parse Arguments
+    parser = argparse.ArgumentParser(description='Parse attributes string')
+    parser.add_argument('attributes', type=str, help='Attribute string to be parsed')
+    if len(sys.argv) >= 2:
+        args = parser.parse_args()
+        parsed_attrs = parse_attributes(args.attributes)
+        config.criteria = parsed_attrs
+
     # make a random number based on the time
     random.seed(3)
     seed_env = random.randint(0, 100000)
@@ -265,17 +275,11 @@ if __name__ == '__main__':
     random_baseline_cfs = []
     random_baseline_orgs = []
 
-    for runs in range(config.num_runs):
-        print("run: ", runs)
-        # reset the environment
-        seed_env = random.randint(0, 100000)
-        vec_env = VecEnv(config.env_id, config.n_workers, seed=seed_env)
-        states = vec_env.reset()
-        states_tensor = torch.tensor(states).float().to(device)
-        
-        # generate the original trajectory
-        org_traj = generate_original_trajectory(ppo, discriminator, vec_env, states_tensor)
-
+    org_traj_seed = pickle.load(open('original_trajectories_and_seeds.pkl', 'rb'))
+    run = 0
+    for org_traj, seed_env in org_traj_seed:
+        print('run', run)
+        run += 1
         # generate the counterfactual trajectories
         counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
 

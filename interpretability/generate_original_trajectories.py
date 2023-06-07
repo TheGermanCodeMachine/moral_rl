@@ -53,7 +53,7 @@ def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
     org_traj = {'states': [], 'actions': [], 'rewards': []}
     citizen_sum = 100
     for t in tqdm(range(config.max_steps-1)):
-        if t==6:
+        if t==8:
             a=0
         actions, log_probs = ppo.act(states_tensor)
         next_states, reward, done, info = vec_env.step(actions)
