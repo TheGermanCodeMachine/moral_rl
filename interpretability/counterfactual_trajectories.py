@@ -58,7 +58,8 @@ class config:
     ppo_epochs= 5
     max_steps = 75
     num_runs = 100
-    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    criteria = ['validity']
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -263,6 +264,8 @@ if __name__ == '__main__':
     all_part_orgs = []
     all_part_cfs = []
     all_full_orgs = []
+    random_baseline_cfs = []
+    random_baseline_orgs = []
 
     for runs in range(config.num_runs):
         print("run: ", runs)
@@ -305,21 +308,37 @@ if __name__ == '__main__':
                     'actions': best_counterfactual_trajectory['actions'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
                     'rewards': best_counterfactual_trajectory['rewards'][starts[max_qc_index]:end_cfs[max_qc_index]+1]}
         part_rewards_cf = sum(part_cf['rewards'])
-        if part_rewards_cf in [x[1] for x in all_part_cfs]:
-            a=0
         all_part_cfs.append((part_cf, part_rewards_cf))
 
 
         full_rewards = sum(org_traj['rewards'])
         all_full_orgs.append((org_traj, starts[max_qc_index], end_cfs[max_qc_index]+1 - starts[max_qc_index], full_rewards))
 
+        # pick a random counterfactual as the baseline
+        random_cf_index = random.randint(0, len(counterfactual_trajs)-1)
+        part_random_org = {'states' : org_traj['states'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
+                    'actions': org_traj['actions'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
+                    'rewards': org_traj['rewards'][starts[random_cf_index]:end_orgs[random_cf_index]+1]}
+        random_org_reward = sum(part_random_org['rewards'])
+        random_baseline_orgs.append((part_random_org, random_org_reward))
+
+        part_random_cf = {'states' : counterfactual_trajs[random_cf_index]['states'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
+                    'actions': counterfactual_trajs[random_cf_index]['actions'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
+                    'rewards': counterfactual_trajs[random_cf_index]['rewards'][starts[random_cf_index]:end_cfs[random_cf_index]+1]}
+        random_cf_reward = sum(part_random_cf['rewards'])
+        random_baseline_cfs.append((part_random_cf, random_cf_reward))
 
 
-    base_path = '.\evaluation\datasets\\100_ablations\pvcd100'
+
+    base_path = '.\evaluation\datasets\\100_ablations\\baseline'
     # save the trajectories
-    with open(base_path + '\org_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_part_orgs, f)
-    with open(base_path + '\cf_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_part_cfs, f)
-    with open(base_path + '\\full_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_full_orgs, f)
+    # with open(base_path + '\org_trajectories.pkl', 'wb') as f:
+    #     pickle.dump(all_part_orgs, f)
+    # with open(base_path + '\cf_trajectories.pkl', 'wb') as f:
+    #     pickle.dump(all_part_cfs, f)
+    # with open(base_path + '\\full_trajectories.pkl', 'wb') as f:
+    #     pickle.dump(all_full_orgs, f)
+    with open(base_path + '\\cf_random_baselines.pkl', 'wb') as f:
+        pickle.dump(random_baseline_cfs, f)
+    with open(base_path + '\org_random_baselines.pkl', 'wb') as f:
+        pickle.dump(random_baseline_orgs, f)

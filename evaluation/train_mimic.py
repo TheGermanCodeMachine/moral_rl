@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 from evaluate_mimic import evaluate_mimic
 import sys
 import random
-from utils.util_functions import iterate_through_folder
+from utils.util_functions import iterate_through_folder, save_results
 
 class hyperparameters:
     learning_rate = 1e-1
@@ -167,12 +167,12 @@ def contrastive_learning(path_org, path_cf):
     print_example_predictions(model, test_set, test_labels)
     show_loss_plot(train_losses, test_losses)
 
-def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=True):
+def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0):
     org_features = pickle.load(open(path_org, 'rb'))
     cf_features = pickle.load(open(path_cf, 'rb'))
     num_features = len(org_features[0])-1
 
-    test_losses = []
+    test_lossess = []
     train_lossess = []
     all_train_losses = []
     test_mean_errors = []
@@ -192,7 +192,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=Tr
 
         test_loss, test_mean_error, pearson_correlation, spearman_correlation = evaluate_mimic(model, test_set, test_labels)
 
-        test_losses.append(test_loss)
+        test_lossess.append(test_loss)
         test_mean_errors.append(test_mean_error)
         pearson_correlations.append(pearson_correlation)
         spearman_correlations.append(spearman_correlation)
@@ -204,42 +204,26 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=Tr
 
     print('final train_loss', np.mean(train_losses))
     print('final train mean error', np.mean(train_mean_errors))
-    print('final test_loss', np.mean(test_losses))
+    print('final test_loss', np.mean(test_lossess))
     print('final test mean error', np.mean(test_mean_errors))
     print('final pearson correlation', np.mean(pearson_correlations))
     print('final spearman correlation', np.mean(spearman_correlations))
     weights = np.mean(weights, axis=0)
     print('final weights', [v + ": " + str(weights[k]) for k,v in enumerate(config.features)])
-    train_lossess = np.mean(train_lossess, axis=0)
-    test_losses = np.mean(test_losses, axis=0)
     all_train_losses = np.mean(all_train_losses, axis=0)
     all_test_losses = np.mean(all_test_losses, axis=0)
     show_loss_plot(all_train_losses, all_test_losses)
 
     if config.save_results:
-        to_save = {'train_losses': train_lossess, 'test_losses': test_losses, 'test_mean_errors': test_mean_errors, 
+        to_save = {'train_losses': train_lossess, 'test_losses': test_lossess, 'test_mean_errors': test_mean_errors, 
                    'train_mean_errors': train_mean_errors, 'pearson_correlations': pearson_correlations, 'spearman_correlations': spearman_correlations, 
                    'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses}
         
-        path = base_path + "\\results\\"
-        #  if the results folder does not exist, create it
-        print(os.path.dirname(path))
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
-        if contrastive:
-            path += "contrastive_learning"
-        else:
-            path += "non_contrastive_learning"
-        if baseline:
-            path += "_baseline.pkl"
-        else:
-            path += "_counterfactual.pkl"
-        with open(path, 'wb') as f:
-            pickle.dump(to_save, f)
+        save_results(to_save, base_path, contrastive, baseline)
 
 
 if __name__ == '__main__':
-    folder_path = 'evaluation\datasets\\100_ablations\pv100'
+    folder_path = 'evaluation\datasets\\100_ablations'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:
@@ -255,13 +239,26 @@ if __name__ == '__main__':
 
         # contrastive learning
         print('# BASELINE Contrastive Learning')
-        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=True, baseline=True)
+        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=True, baseline=2)
         print('-------------------------')
         print('# COUNTERFACTUAL Contrastive Learning')
-        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=False)
+        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=0)
         print('-------------------------')
         print('# BASELINE Non-Contrastive Learning')
-        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=False, baseline=True)
+        learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=False, baseline=2)
         print('-------------------------')
         print('# COUNTERFACTUAL Non-Contrastive Learning')
-        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=False, baseline=False)
+        learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=False, baseline=0)
+
+    # remove all letters from the folder path starting from the last backslash (going up one folder)
+    # base_path_root = folder_path[:folder_path.rfind('\\')]
+    # base_path += '\\baseline'
+    # path_org_no_quality = folder_path + '\org_features.pkl'
+    # path_cf_no_quality = folder_path + '\cf_features.pkl'
+
+    # print('-------------------------')
+    # print('# NO QUALITY Contrastive Learning')
+    # learning_repeats(path_org_no_quality, path_cf_no_quality, base_path_root, contrastive=True, baseline=1)
+    # print('-------------------------')
+    # print('# NO QUALITY Non-Contrastive Learning')
+    # learning_repeats(path_org_no_quality, path_cf_no_quality, base_path_root, contrastive=False, baseline=1)

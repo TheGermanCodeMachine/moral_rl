@@ -35,32 +35,34 @@ def extract_features(trajectories):
     all_features = [list(a) for a in zip(citizens_saveds, unsaved_citizenss, distance_to_citizens, standing_on_extinguishers, lengths)]
     return all_features
 
-def part_trajectories_to_features(path_org, path_cf, base_path):
+def part_trajectories_to_features(base_path, path_org, path_cf=None):
     # Load trajectories.
     with open(path_org, 'rb') as f:
         org_trajs = pickle.load(f)
     
     org_trajectories = [d[0] for d in org_trajs]
     org_rewards = [d[1] for d in org_trajs]
-    
-    with open(path_cf, 'rb') as f:
-        cf_trajs = pickle.load(f)
 
-    cf_trajectories = [d[0] for d in cf_trajs]
-    cf_rewards = [d[1] for d in cf_trajs]
-
-    # Extract features.
     org_features = extract_features(org_trajectories)
-    cf_features = extract_features(cf_trajectories)
     org_features = [f + [r] for f,r in zip(org_features, org_rewards)]
-    cf_features = [f + [r] for f,r in zip(cf_features, cf_rewards)]
 
     # Save features.
     with open(base_path + '\org_features.pkl', 'wb') as f:
         pickle.dump(org_features, f)
     
-    with open(base_path + '\cf_features.pkl', 'wb') as f:
-        pickle.dump(cf_features, f)
+    if path_cf:
+        with open(path_cf, 'rb') as f:
+            cf_trajs = pickle.load(f)
+
+        cf_trajectories = [d[0] for d in cf_trajs]
+        cf_rewards = [d[1] for d in cf_trajs]
+
+        # Extract features.
+        cf_features = extract_features(cf_trajectories)
+        cf_features = [f + [r] for f,r in zip(cf_features, cf_rewards)]
+        
+        with open(base_path + '\cf_features.pkl', 'wb') as f:
+            pickle.dump(cf_features, f)
 
 
 
@@ -112,11 +114,18 @@ def full_trajectories_to_features(path_full, base_path):
         pickle.dump(part_features2, f)
 
 if __name__ == '__main__':
-    base_path = 'evaluation\datasets\\100_ablations\pvd100'
+    # base_path = 'evaluation\datasets\\100_ablations\pvd100'
 
-    path_org = base_path + '\org_trajectories.pkl'
-    path_cf = base_path + '\cf_trajectories.pkl'
-    path_full = base_path + '\\full_trajectories.pkl'
+    # path_org = base_path + '\org_trajectories.pkl'
+    # path_cf = base_path + '\cf_trajectories.pkl'
+    # path_full = base_path + '\\full_trajectories.pkl'
 
-    part_trajectories_to_features(path_org, path_cf, base_path)
-    full_trajectories_to_features(path_full, base_path)
+    # part_trajectories_to_features(base_path, path_org, path_cf)
+    # full_trajectories_to_features(path_full, base_path)
+
+    # baseline
+    base_path = 'evaluation\datasets\\100_ablations\\baseline'
+    path_baseline_org = base_path + '\org_random_baselines.pkl'
+    path_baseline_cf = base_path + '\\cf_random_baselines.pkl'
+
+    part_trajectories_to_features(base_path, path_baseline_org, path_baseline_cf)

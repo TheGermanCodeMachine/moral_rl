@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import pickle
 
 def extract_player_position(state):
     if len(state[0]==1):
@@ -67,6 +68,24 @@ def iterate_through_folder(folder_path):
             else:
                 # in this case we have reached the relevant folder and don't want to go deeper
                 return [folder_path]
+        # remove paths ending with 'baseline'
+        all_folder_base_paths = [path for path in all_folder_base_paths if not path.endswith('baseline')]
         return all_folder_base_paths
     else:
         return [folder_path]
+    
+def save_results(to_save, base_path, contrastive, baseline=0):
+    path = base_path + "\\results\\"
+    #  if the results folder does not exist, create it
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
+
+    # make the file name
+    if contrastive: path += "contrastive_learning"
+    else: path += "non_contrastive_learning"
+    if baseline==2: path += "_random_baseline.pkl"
+    elif baseline==0: path += "_counterfactual.pkl"
+    else: path += "_no_quality_baseline.pkl"
+    # save the results
+    with open(path, 'wb') as f:
+        pickle.dump(to_save, f)
