@@ -24,7 +24,7 @@ from utils.visualize_trajectory import visualize_two_trajectories, visualize_two
 from utils.util_functions import *
 import random 
 import time
-from quality_metrics.quality_metrics import measure_quality, get_all_combinations_of_qc
+from quality_metrics.quality_metrics import measure_quality
 from quality_metrics.diversity_measures import diversity_all
 from quality_metrics.validity_measures import validity_all as validity
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
@@ -51,20 +51,13 @@ class config:
 def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
      # create one trajectory with ppo
     org_traj = {'states': [], 'actions': [], 'rewards': []}
-    citizen_sum = 100
     for t in tqdm(range(config.max_steps-1)):
-        if t==8:
-            a=0
         actions, log_probs = ppo.act(states_tensor)
         next_states, reward, done, info = vec_env.step(actions)
         org_traj['states'].append(states_tensor)
         # Note: Actions currently append as arrays and not integers!
         org_traj['actions'].append(actions)
         org_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
-        sum = torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item()
-        if torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item() > citizen_sum:
-            a=0
-        citizen_sum = torch.sum(org_traj['states'][-1][0][2], dim = (0,1)).item()
 
         if done[0]:
             next_states = vec_env.reset()
@@ -120,5 +113,5 @@ if __name__ == '__main__':
         original_trajectories_and_seeds.append((org_traj, seed_env))
 
     # save the original trajectories
-    with open('original_trajectories_and_seeds.pkl', 'wb') as f:
+    with open('original_trajectories_and_seeds_fixed_citizen_bug.pkl', 'wb') as f:
         pickle.dump(original_trajectories_and_seeds, f)

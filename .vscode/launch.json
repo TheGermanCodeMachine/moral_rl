@@ -46,6 +46,19 @@
             "args": [
                 "evaluation\\datasets\\100_ablations",
             ]
-        }
-    ]
+        },
+
+        {
+            "name": "generate_cf_pv",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/interpretability/counterfactual_trajectories.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "vbp",
+            ]
+        },
+
+
 }

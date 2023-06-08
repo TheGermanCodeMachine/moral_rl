@@ -54,3 +54,6 @@ def distance_all(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs):
     for i in range(len(counterfactual_trajs)):
         dist.append(my_distance(org_traj, counterfactual_trajs[i], starts[i], end_cfs[i], end_orgs[i]))
     return dist
+
+def distance_single(org_traj, counterfactual_traj, start, end_cf, end_org):
+    return my_distance(org_traj, counterfactual_traj, start, end_cf, end_org)

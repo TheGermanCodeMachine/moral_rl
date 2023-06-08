@@ -71,6 +71,23 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_traj_orgs,
     start_state_divs = normalise_values(start_state_divs)
     return length_divs + start_time_divs + start_state_divs
 
+def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_traj_orgs, prev_traj_cfs, prev_starts, prev_ends_cf, prev_ends_org):
+    if len(prev_starts) == 0:
+        return 0
+    iterate_prev = range(len(prev_starts))
+    # take only the part of the previous trajectories between the start and end of the CTE
+    prev_org_traj = [{'states': prev_traj_orgs[x]['states'][prev_starts[x]:prev_ends_org[x]+1], 'actions': prev_traj_orgs[x]['actions'][prev_starts[x]:prev_ends_org[x]+1], 'rewards': prev_traj_orgs[x]['rewards'][prev_starts[x]:prev_ends_org[x]+1]} for x in iterate_prev]
+    prev_cf_traj = [{'states': prev_traj_cfs[x]['states'][prev_starts[x]:prev_ends_cf[x]+1], 'actions': prev_traj_cfs[x]['actions'][prev_starts[x]:prev_ends_cf[x]+1], 'rewards': prev_traj_cfs[x]['rewards'][prev_starts[x]:prev_ends_cf[x]+1]} for x in iterate_prev]
+    all_prev_traj = prev_org_traj.copy()
+    all_prev_traj.extend(prev_cf_traj)
+    all_rotated_trajs = [t for x in all_prev_traj for t in rotated_trajectories(x)]
+    
+    length_div, start_time_div, start_state_div = diversity(org_traj, cf_traj, start, end_cf, end_org, prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
+    return length_div + start_time_div + start_state_div
+    
+    
+
+
 def length_diversity(dev, prev_dev):
     # pick out the 3 values in prev_dev that are closest to dev
     # return the average of the 3 values

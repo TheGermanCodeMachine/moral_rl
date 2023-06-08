@@ -24,7 +24,7 @@ from utils.visualize_trajectory import visualize_two_trajectories, visualize_two
 from utils.util_functions import *
 import random 
 import time
-from quality_metrics.quality_metrics import measure_quality, get_all_combinations_of_qc
+from quality_metrics.quality_metrics import measure_quality, evaluate_qcs_for_cte
 from quality_metrics.diversity_measures import diversity_all
 from quality_metrics.validity_measures import validity_all as validity
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
@@ -50,6 +50,8 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
+    base_path = '.\evaluation\datasets\\100_ablations\\'
+    measure_statistics = True
     num_runs = 100
     criteria = ['validity', 'diversity', 'proximity', 'critical_state']
     # criteria = ['validity']
@@ -60,9 +62,21 @@ def parse_attributes(arg_str):
         'v': 'validity',
         'c': 'critical_state',
         'd': 'diversity',
+        'b': 'baseline',
     }
     return [attr_map[c] for c in arg_str if c in attr_map]
 
+def sort_args(arg_str):
+    attr_map = {
+        'p': 0,
+        'v': 1,
+        'c': 2,
+        'd': 3,
+    }
+    add_pos = [(c, attr_map[c]) for c in arg_str if c in attr_map and c != 'b']
+    add_pos.sort(key=lambda x: x[1])
+    return ''.join([c[0] for c in add_pos])
+    
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
     if step > start+1:
@@ -233,10 +247,14 @@ if __name__ == '__main__':
     # Parse Arguments
     parser = argparse.ArgumentParser(description='Parse attributes string')
     parser.add_argument('attributes', type=str, help='Attribute string to be parsed')
+    folder_string = ''
     if len(sys.argv) >= 2:
         args = parser.parse_args()
         parsed_attrs = parse_attributes(args.attributes)
+        folder_string = sort_args(args.attributes)
         config.criteria = parsed_attrs
+
+    baseline = 'baseline' in config.criteria
 
     # make a random number based on the time
     random.seed(3)
@@ -275,72 +293,121 @@ if __name__ == '__main__':
     random_baseline_cfs = []
     random_baseline_orgs = []
 
-    org_traj_seed = pickle.load(open('original_trajectories_and_seeds.pkl', 'rb'))
+    lengths_org = []
+    lengths_cf = []
+    start_points = []
+    quality_criteria = []
+    effiencies = []
+
+    org_traj_seed = pickle.load(open('original_trajectories_and_seeds_fixed_citizen_bug.pkl', 'rb'))
     run = 0
     for org_traj, seed_env in org_traj_seed:
+        if run >= config.num_runs:
+            break
         print('run', run)
         run += 1
+        time_start = time.time()
         # generate the counterfactual trajectories
         counterfactual_trajs, counterfactual_rewards, counterfactual_deviations, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
 
-        # calculate the quality criteria for each counterfactual trajectory
-        qc_values = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
-        # get the qc_values[0] with the highest qc_values[1]
-        max_qc_index = qc_values[0][0]
-        # get the counterfactual trajectory with the largest absolute difference from the original reward
-        best_counterfactual_trajectory = counterfactual_trajs[max_qc_index]
+        if not baseline:
+            # calculate the quality criteria for each counterfactual trajectory
+            max_qc_index = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
+            best_counterfactual_trajectory = counterfactual_trajs[max_qc_index]
 
-        # visualize only the part of the trajectory that is different
-        # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_cfs[max_qc_index],  end_orgs[max_qc_index])
+            efficiency = time.time() - time_start
 
-        # add the original trajectory and the counterfactual trajectory to the list of all trajectories
-        all_org_trajs.append(org_traj)
-        all_cf_trajs.append(best_counterfactual_trajectory)
-        all_starts.append(starts[max_qc_index])
-        all_end_orgs.append(end_orgs[max_qc_index])
-        all_end_cfs.append(end_cfs[max_qc_index])
+            # visualize only the part of the trajectory that is different
+            # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_cfs[max_qc_index],  end_orgs[max_qc_index])
 
-        part_org = {'states' : org_traj['states'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
-                    'actions': org_traj['actions'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
-                    'rewards': org_traj['rewards'][starts[max_qc_index]:end_orgs[max_qc_index]+1]}
-        part_rewards = sum(part_org['rewards'])
-        all_part_orgs.append((part_org, part_rewards))
+            # add the original trajectory and the counterfactual trajectory to the list of all trajectories
+            all_org_trajs.append(org_traj)
+            all_cf_trajs.append(best_counterfactual_trajectory)
+            all_starts.append(starts[max_qc_index])
+            all_end_orgs.append(end_orgs[max_qc_index])
+            all_end_cfs.append(end_cfs[max_qc_index])
 
-        part_cf = {'states' : best_counterfactual_trajectory['states'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
-                    'actions': best_counterfactual_trajectory['actions'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
-                    'rewards': best_counterfactual_trajectory['rewards'][starts[max_qc_index]:end_cfs[max_qc_index]+1]}
-        part_rewards_cf = sum(part_cf['rewards'])
-        all_part_cfs.append((part_cf, part_rewards_cf))
+            part_org = {'states' : org_traj['states'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
+                        'actions': org_traj['actions'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
+                        'rewards': org_traj['rewards'][starts[max_qc_index]:end_orgs[max_qc_index]+1]}
+            part_rewards = sum(part_org['rewards'])
+            all_part_orgs.append((part_org, part_rewards))
+
+            part_cf = {'states' : best_counterfactual_trajectory['states'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
+                        'actions': best_counterfactual_trajectory['actions'][starts[max_qc_index]:end_cfs[max_qc_index]+1],
+                        'rewards': best_counterfactual_trajectory['rewards'][starts[max_qc_index]:end_cfs[max_qc_index]+1]}
+            part_rewards_cf = sum(part_cf['rewards'])
+            all_part_cfs.append((part_cf, part_rewards_cf))
 
 
-        full_rewards = sum(org_traj['rewards'])
-        all_full_orgs.append((org_traj, starts[max_qc_index], end_cfs[max_qc_index]+1 - starts[max_qc_index], full_rewards))
+            full_rewards = sum(org_traj['rewards'])
+            all_full_orgs.append((org_traj, starts[max_qc_index], end_cfs[max_qc_index]+1 - starts[max_qc_index], full_rewards))
+
+            if config.measure_statistics:
+                # record stastics
+                lengths_org.append(end_orgs[max_qc_index]+1 - starts[max_qc_index])
+                lengths_cf.append(end_cfs[max_qc_index]+1 - starts[max_qc_index])
+                start_points.append(starts[max_qc_index])
+                best_val, best_prox, best_crit, best_dive = evaluate_qcs_for_cte(max, org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_orgs[max_qc_index], end_cfs[max_qc_index], ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+                quality_criteria.append((best_val, best_prox, best_crit, best_dive))
+                effiencies.append(efficiency)
 
         # pick a random counterfactual as the baseline
-        random_cf_index = random.randint(0, len(counterfactual_trajs)-1)
-        part_random_org = {'states' : org_traj['states'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
-                    'actions': org_traj['actions'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
-                    'rewards': org_traj['rewards'][starts[random_cf_index]:end_orgs[random_cf_index]+1]}
-        random_org_reward = sum(part_random_org['rewards'])
-        random_baseline_orgs.append((part_random_org, random_org_reward))
+        if baseline:
+            random_cf_index = random.randint(0, len(counterfactual_trajs)-1)
+            part_random_org = {'states' : org_traj['states'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
+                        'actions': org_traj['actions'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
+                        'rewards': org_traj['rewards'][starts[random_cf_index]:end_orgs[random_cf_index]+1]}
+            random_org_reward = sum(part_random_org['rewards'])
+            random_baseline_orgs.append((part_random_org, random_org_reward))
 
-        part_random_cf = {'states' : counterfactual_trajs[random_cf_index]['states'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
-                    'actions': counterfactual_trajs[random_cf_index]['actions'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
-                    'rewards': counterfactual_trajs[random_cf_index]['rewards'][starts[random_cf_index]:end_cfs[random_cf_index]+1]}
-        random_cf_reward = sum(part_random_cf['rewards'])
-        random_baseline_cfs.append((part_random_cf, random_cf_reward))
+            part_random_cf = {'states' : counterfactual_trajs[random_cf_index]['states'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
+                        'actions': counterfactual_trajs[random_cf_index]['actions'][starts[random_cf_index]:end_cfs[random_cf_index]+1],
+                        'rewards': counterfactual_trajs[random_cf_index]['rewards'][starts[random_cf_index]:end_cfs[random_cf_index]+1]}
+            random_cf_reward = sum(part_random_cf['rewards'])
+            random_baseline_cfs.append((part_random_cf, random_cf_reward))
 
 
+    if not baseline:
+        print('avg length org: ', np.mean(lengths_org))
+        print('avg length cf: ', np.mean(lengths_cf))
+        print('avg start point: ', np.mean(start_points))
+        print('avg quality criteria: ', np.mean(quality_criteria, axis=0))
+        print('avg generation time: ', np.mean(effiencies))
 
-    base_path = '.\evaluation\datasets\\100_ablations\\baseline'
-    # save the trajectories
-    # with open(base_path + '\org_trajectories.pkl', 'wb') as f:
-    #     pickle.dump(all_part_orgs, f)
-    # with open(base_path + '\cf_trajectories.pkl', 'wb') as f:
-    #     pickle.dump(all_part_cfs, f)
-    # with open(base_path + '\\full_trajectories.pkl', 'wb') as f:
-    #     pickle.dump(all_full_orgs, f)
-    with open(base_path + '\\cf_random_baselines.pkl', 'wb') as f:
-        pickle.dump(random_baseline_cfs, f)
-    with open(base_path + '\org_random_baselines.pkl', 'wb') as f:
-        pickle.dump(random_baseline_orgs, f)
+        path_folder = config.base_path + folder_string + str(config.num_runs)
+        if not os.path.exists(path_folder):
+            os.makedirs(path_folder)
+
+        #save the trajectories
+        with open(path_folder + '\org_trajectories.pkl', 'wb') as f:
+            pickle.dump(all_part_orgs, f)
+        with open(path_folder + '\cf_trajectories.pkl', 'wb') as f:
+            pickle.dump(all_part_cfs, f)
+        with open(path_folder + '\\full_trajectories.pkl', 'wb') as f:
+            pickle.dump(all_full_orgs, f)
+
+        if config.measure_statistics:
+            # saving statistics
+            # check if folder statistics exists
+            if not os.path.exists(path_folder + '\statistics'):
+                os.makedirs(path_folder + '\statistics')
+                
+            with open(path_folder + '\statistics\lengths_org.pkl', 'wb') as f:
+                pickle.dump(lengths_org, f)
+            with open(path_folder + '\statistics\lengths_cf.pkl', 'wb') as f:
+                pickle.dump(lengths_cf, f)
+            with open(path_folder + '\statistics\start_points.pkl', 'wb') as f:
+                pickle.dump(start_points, f)
+            with open(path_folder + '\statistics\quality_criteria.pkl', 'wb') as f:
+                pickle.dump(quality_criteria, f)
+            with open(path_folder + '\statistics\effiencies.pkl', 'wb') as f:
+                pickle.dump(effiencies, f)
+        
+    else:
+        baseline_path = config.base_path + '\\baseline'
+        
+        with open(baseline_path + '\\cf_random_baselines.pkl', 'wb') as f:
+            pickle.dump(random_baseline_cfs, f)
+        with open(baseline_path + '\org_random_baselines.pkl', 'wb') as f:
+            pickle.dump(random_baseline_orgs, f)

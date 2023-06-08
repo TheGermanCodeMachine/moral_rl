@@ -13,3 +13,8 @@ def validity_all(org, cfs, starts, end_cfs, end_orgs):
         cf_reward = np.mean(cfs[r]['rewards'][starts[r]:end_cfs[r]+1])
         vals.append(abs_diff(org_reward, cf_reward))
     return vals
+
+def validity_single(org, cf, start, end_cf, end_org):
+    org_reward = np.mean(org['rewards'][start:end_org+1])
+    cf_reward = np.mean(cf['rewards'][start:end_cf+1])
+    return abs_diff(org_reward, cf_reward)
