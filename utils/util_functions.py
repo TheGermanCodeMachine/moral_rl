@@ -17,7 +17,15 @@ def distance_subtrajectories(traj1, traj2):
             dist_table[i,j] = state_action_diff(traj1['states'][i], traj1['actions'][i], traj2['states'][j], traj2['actions'][j])
 
     # calculate the modified Hausdorff distance based on the distance table (see: Dubuisson, M. P., & Jain, A. K. (1994, October). A modified Hausdorff distance for object matching. In Proceedings of 12th international conference on pattern recognition (Vol. 1, pp. 566-568). IEEE.)
-    dist_A_B = np.mean(np.min(dist_table, axis=1))
+    try:
+        dist_A_B = np.mean(np.min(dist_table, axis=1))
+    except:
+        print("ERROR HERE")
+        print(dist_table)
+        print(traj1)
+        print(traj2)
+        print(len(traj1['states']))
+        print(len(traj2['states']))
     dist_B_A = np.mean(np.min(dist_table, axis=0))
     return max(dist_A_B, dist_B_A)
 
@@ -62,7 +70,7 @@ def iterate_through_folder(folder_path):
         all_folder_base_paths = []
         for subfolder in subfolders:
             # subfolder shouldn't be called results
-            if not subfolder.endswith('results'):
+            if not subfolder.endswith('results') and not subfolder.endswith('statistics'):
                 subsubfolders = iterate_through_folder(subfolder)
                 all_folder_base_paths.extend(subsubfolders)
             else:
@@ -74,18 +82,21 @@ def iterate_through_folder(folder_path):
     else:
         return [folder_path]
     
-def save_results(to_save, base_path, contrastive, baseline=0):
+def save_results(to_save, base_path, contrastive, baseline=0, hyper_params=False):
     path = base_path + "\\results\\"
     #  if the results folder does not exist, create it
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
 
-    # make the file name
-    if contrastive: path += "contrastive_learning"
-    else: path += "non_contrastive_learning"
-    if baseline==2: path += "_random_baseline.pkl"
-    elif baseline==0: path += "_counterfactual.pkl"
-    else: path += "_no_quality_baseline.pkl"
+    if hyper_params:
+        path += "hyperparameters.pkl"
+    else:
+        # make the file name
+        if contrastive: path += "contrastive_learning"
+        else: path += "non_contrastive_learning"
+        if baseline==2: path += "_random_baseline.pkl"
+        elif baseline==0: path += "_counterfactual.pkl"
+        else: path += "_no_quality_baseline.pkl"
     # save the results
     with open(path, 'wb') as f:
         pickle.dump(to_save, f)

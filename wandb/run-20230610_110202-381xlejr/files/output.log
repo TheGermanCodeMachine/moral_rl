@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train_learned.py", line 57, in <module>
+    ppo.load_state_dict('saved_models\\tmp\ppo_v2_learned_[1, 10]tmp_170000.pt', map_location=torch.device('cpu'))
+TypeError: load_state_dict() got an unexpected keyword argument 'map_location'

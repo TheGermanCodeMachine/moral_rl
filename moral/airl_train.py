@@ -15,9 +15,21 @@ import wandb
 # Device Check
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+class config:
+        env_id = 'randomized_v2'
+        env_steps = 3e6
+        batchsize_discriminator = 512
+        batchsize_ppo = 12
+        n_workers = 12
+        entropy_reg = 0
+        gamma = 0.999
+        epsilon = 0.1
+        ppo_epochs = 5
+        lambd = [1, 10]
+    
 if __name__ == '__main__':
     # Load demonstrations
-    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_75_[0,1].pk', 'rb'))
+    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_75_[1,10].pk', 'rb'))
 
 
 
@@ -31,9 +43,10 @@ if __name__ == '__main__':
         'entropy_reg': 0,
         'gamma': 0.999,
         'epsilon': 0.1,
-        'ppo_epochs': 5
+        'ppo_epochs': 5,
+        'lambd': [1,10]
     })
-    config = wandb.config
+    
 
     # Create Environment
     vec_env = SubprocVecEnv([make_env(config.env_id, i) for i in range(config.n_workers)])
@@ -55,6 +68,8 @@ if __name__ == '__main__':
 
     # Logging
     objective_logs = []
+    true_returns = []
+
 
     for t in tqdm(range((int(config.env_steps/config.n_workers)))):
         # at every 10% of the training process save a copy of the model
@@ -65,9 +80,11 @@ if __name__ == '__main__':
         # Act
         actions, log_probs = ppo.act(states_tensor)
         next_states, rewards, done, info = vec_env.step(actions)
+        scalarised_reward = [sum([config.lambd[i] * r[i] for i in range(len(r))]) for r in rewards]
 
         # Log Objectives
         objective_logs.append(rewards)
+        true_returns.append(scalarised_reward)
 
         # Calculate (vectorized) AIRL reward
         airl_state = torch.tensor(states).to(device).float()
@@ -81,10 +98,15 @@ if __name__ == '__main__':
 
         if train_ready:
             # Log Objectives
-            objective_logs = np.array(objective_logs).sum(axis=0)
+            objective_logs = np.array(objective_logs)
+            objective_logs = objective_logs.sum(axis=0)
             for i in range(objective_logs.shape[1]):
                 wandb.log({'Obj_' + str(i): objective_logs[:, i].mean()})
             objective_logs = []
+            true_returns = np.array(true_returns)
+            true_returns = true_returns.sum(axis=0)
+            wandb.log({'True Return': true_returns.mean()})
+            true_returns = []
 
             # Update Models
             update_policy(ppo, dataset, optimizer, config.gamma, config.epsilon, config.ppo_epochs,
@@ -100,13 +122,19 @@ if __name__ == '__main__':
             wandb.log({'Discriminator Loss': d_loss,
                        'Fake Accuracy': fake_acc,
                        'Real Accuracy': real_acc})
-            for ret in dataset.log_returns():
-                wandb.log({'Returns': ret})
+            airl_returns = dataset.log_returns()
+            wandb.log({'avg_airl_reward': np.mean(airl_returns)})
+            for ret in airl_returns:
+                wandb.log({'AIRL Returns': ret})
             dataset.reset_trajectories()
 
         # Prepare state input for next time step
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
+        if t % 10000 == 0:
+            torch.save(discriminator.state_dict(), 'saved_models/tmp/discriminator_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
+            torch.save(ppo.state_dict(), 'saved_models/tmp/ppo_airl_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
 
     vec_env.close()
-    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')
+    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[1,10].pt')
+    torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[1,10].pt')

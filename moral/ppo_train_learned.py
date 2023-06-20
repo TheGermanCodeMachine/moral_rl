@@ -24,15 +24,15 @@ if __name__ == '__main__':
     # Init WandB & Parameters
     wandb.init(project='PPO', config={
         'env_id': 'randomized_v2',
-        'env_steps': 3e6,
+        'env_steps': 6e6,
         'batchsize_ppo': 12,
         'n_workers': 12,
         'lr_ppo': 5e-4,
-        'entropy_reg': 0.05,
+        'entropy_reg': 0.15,
         'gamma': 0.999,
         'epsilon': 0.1,
         'ppo_epochs': 5,
-        'lambd': [0, 1]
+        'lambd': [1, 10]
     })
     config = wandb.config
 
@@ -52,12 +52,14 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(ppo.parameters(), lr=config.lr_ppo)
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
-    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[0,1].pt', map_location=torch.device('cpu')))
+    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
 
+    ppo.load_state_dict(torch.load('saved_models\\tmp\ppo_v2_learned_[1, 10]tmp_320000.pt', map_location=torch.device('cpu')))
+    
     objective_logs = []
     true_returns_logs = []
 
-    for t in tqdm(range(int(config.env_steps / config.n_workers))):
+    for t in tqdm(range(320000, int(config.env_steps / config.n_workers))):
         actions, log_probs = ppo.act(states_tensor)
         next_states, rewards, done, info = vec_env.step(actions)
         # how many dimensions are there in rewards? If it's more than 1, just reduce it to the one about saving people
@@ -90,5 +92,8 @@ if __name__ == '__main__':
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
 
+        if t % 10000 == 0:
+            torch.save(ppo.state_dict(), 'saved_models/tmp/ppo_v2_learned_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
+
     # vec_env.close()
-    torch.save(ppo.state_dict(), 'ppo_airl_v2_' + str(config.lambd) + '.pt')
+    torch.save(ppo.state_dict(), 'saved_models/ppo_v2_learned_[1, 10].pt')

@@ -1,0 +1,25 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  0%|▏                                                                                           | 961/500000 [00:31<4:34:59, 30.25it/s]
+Traceback (most recent call last):
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train.py", line 63, in <module>
+    update_policy(ppo, dataset, optimizer, config.gamma, config.epsilon, config.ppo_epochs,
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo.py", line 147, in update_policy
+    overall_loss.backward()
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\_tensor.py", line 255, in backward
+    torch.autograd.backward(self, gradient, retain_graph, create_graph, inputs=inputs)
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\autograd\__init__.py", line 147, in backward
+    Variable._execution_engine.run_backward(
+KeyboardInterrupt

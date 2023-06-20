@@ -50,11 +50,11 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    base_path = '.\evaluation\datasets\\100_ablations\\'
+    base_path = '.\evaluation\datasets\\100_ablations_3\\'
     measure_statistics = True
     num_runs = 100
-    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
-    # criteria = ['validity']
+    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    criteria = ['validity']
 
 def parse_attributes(arg_str):
     attr_map = {
@@ -156,8 +156,6 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
 
     # this loop is over all timesteps in the original and each loop creates one counterfactual with the action at that timestep changed
     for step in range(0, len(org_traj['actions'])-1):
-        if step == 9:
-            a = 0
         counterfactual_traj = {'states': [], 'actions': [], 'rewards': []}
         counterfactual_deviation = 0
         
@@ -193,7 +191,7 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
             # test if this next step will rejoin the original trajectory
             rejoin_step = test_rejoined_org_traj(org_traj, states_tensor, t, step)
             # TODO I might have to add a test whether there has been enough difference between the two trajectories yet
-            if rejoin_step and rejoin_step < len(org_traj['states'])-1:
+            if rejoin_step and rejoin_step < len(org_traj['states']):
                 end_part_cf = t
 
                 # check if there is a difference in the reward between the counterfactual and the original
@@ -216,6 +214,8 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
             end_part_cf = len(counterfactual_traj['states']) - 1
             
         # if the rewards are the same, then the counterfactual is not informative and we don't include it
+        mean1 = np.mean(counterfactual_traj['rewards'][step:end_part_cf+1])
+        mean2 = np.mean(org_traj['rewards'][step:rejoin_step+1])
         if np.mean(counterfactual_traj['rewards'][step:end_part_cf+1]) - np.mean(org_traj['rewards'][step:rejoin_step+1]) != 0:
             counterfactual_trajs.append(counterfactual_traj)
             counterfactual_rewards.append(torch.mean(torch.tensor(counterfactual_traj['rewards'])))
@@ -256,6 +256,8 @@ if __name__ == '__main__':
 
     baseline = 'baseline' in config.criteria
 
+    print('Criteria: ', config.criteria)
+    
     # make a random number based on the time
     random.seed(3)
     seed_env = random.randint(0, 100000)
@@ -277,10 +279,10 @@ if __name__ == '__main__':
     print('Initializing and Normalizing Rewards...')
     ppo = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
     optimizer = torch.optim.Adam(ppo.parameters(), lr=config.lr_ppo)
-    ppo.load_state_dict(torch.load('saved_models/ppo_airl_v2_[0,1].pt', map_location=torch.device('cpu')))
+    ppo.load_state_dict(torch.load('saved_models/ppo_airl_v2_[1,10].pt', map_location=torch.device('cpu')))
 
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
-    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[0,1].pt', map_location=torch.device('cpu')))
+    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
 
     all_org_trajs = []
     all_cf_trajs = []
@@ -299,7 +301,7 @@ if __name__ == '__main__':
     quality_criteria = []
     effiencies = []
 
-    org_traj_seed = pickle.load(open('original_trajectories_and_seeds_fixed_citizen_bug.pkl', 'rb'))
+    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl.pkl', 'rb'))
     run = 0
     for org_traj, seed_env in org_traj_seed:
         if run >= config.num_runs:
@@ -376,6 +378,7 @@ if __name__ == '__main__':
         print('avg generation time: ', np.mean(effiencies))
 
         path_folder = config.base_path + folder_string + str(config.num_runs)
+        # path_folder = 'evaluation\datasets\combine_old_and_new\\newRnewPi_validity_airl'
         if not os.path.exists(path_folder):
             os.makedirs(path_folder)
 
@@ -392,7 +395,7 @@ if __name__ == '__main__':
             # check if folder statistics exists
             if not os.path.exists(path_folder + '\statistics'):
                 os.makedirs(path_folder + '\statistics')
-                
+
             with open(path_folder + '\statistics\lengths_org.pkl', 'wb') as f:
                 pickle.dump(lengths_org, f)
             with open(path_folder + '\statistics\lengths_cf.pkl', 'wb') as f:
@@ -406,6 +409,8 @@ if __name__ == '__main__':
         
     else:
         baseline_path = config.base_path + '\\baseline'
+        if not os.path.exists(baseline_path):
+            os.makedirs(baseline_path)
         
         with open(baseline_path + '\\cf_random_baselines.pkl', 'wb') as f:
             pickle.dump(random_baseline_cfs, f)

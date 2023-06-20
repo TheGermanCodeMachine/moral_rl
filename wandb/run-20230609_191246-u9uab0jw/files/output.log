@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train_learned.py", line 55, in <module>
+    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 594, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 230, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 211, in __init__
+    super(_open_file, self).__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: 'saved_models/discriminator_v2_[1,10].pt'

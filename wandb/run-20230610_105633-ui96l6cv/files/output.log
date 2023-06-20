@@ -1,0 +1,5 @@
+0it [00:00, ?it/s]
+Traceback (most recent call last):
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train_learned.py", line 99, in <module>
+    torch.save(ppo.state_dict(), 'saved_models/ppo_v2_learned_[1, 10].pt')
+AttributeError: 'collections.OrderedDict' object has no attribute 'state_dict'

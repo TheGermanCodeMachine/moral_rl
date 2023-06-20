@@ -22,8 +22,8 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # General Parameters
 MAX_STEPS = 75
-N_CITIZEN = 6
-N_HOUSE = 0
+N_CITIZEN = 7 #new: 7
+N_HOUSE = 2 # new: 2
 
 WAREHOUSE_ART = \
     ['C#######',

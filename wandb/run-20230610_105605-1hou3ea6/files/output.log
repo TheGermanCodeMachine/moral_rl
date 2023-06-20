@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train_learned.py", line 57, in <module>
+    ppo = torch.load('saved_models\tmp\ppo_v2_learned_[1, 10]tmp_170000.pt', map_location=torch.device('cpu'))
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 594, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 230, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "C:\Users\janwe\AppData\Local\Programs\Python\Python39\lib\site-packages\torch\serialization.py", line 211, in __init__
+    super(_open_file, self).__init__(open(name, mode))
+OSError: [Errno 22] Invalid argument: 'saved_models\tmp\\ppo_v2_learned_[1, 10]tmp_170000.pt'

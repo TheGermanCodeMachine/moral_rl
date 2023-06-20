@@ -23,12 +23,12 @@ if __name__ == '__main__':
     # Init WandB & Parameters
     wandb.init(project='PPO', config={
         'env_id': 'randomized_v2',
-        'env_steps': 3e6,
+        'env_steps': 6e6,
         'batchsize_ppo': 12,
         'n_workers': 12,
         'lr_ppo': 5e-4,
-        'entropy_reg': 0.05,
-        'lambd': [0, 1],
+        'entropy_reg': 0.25,
+        'lambd': [1, 10],
         'gamma': 0.999,
         'epsilon': 0.1,
         'ppo_epochs': 5
@@ -69,9 +69,12 @@ if __name__ == '__main__':
                 wandb.log({'Returns': ret})
             dataset.reset_trajectories()
 
+        if t % 10000 == 0:
+            torch.save(ppo.state_dict(), 'ppo_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
+
         # Prepare state input for next time step
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
 
     # vec_env.close()
-    torch.save(ppo.state_dict(), 'ppo_v3_' + str(config.lambd) + '.pt')
+    torch.save(ppo.state_dict(), 'ppo_v2_' + str(config.lambd) + '.pt')

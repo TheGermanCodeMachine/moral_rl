@@ -21,7 +21,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 # General Parameters
-MAX_STEPS = 75
+MAX_STEPS = 60
 N_MAIL = 12
 N_CITIZEN = 12
 N_STREET = 12

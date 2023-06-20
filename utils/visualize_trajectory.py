@@ -44,7 +44,8 @@ TYPE_TO_STRING = {0: {"letter": "#", "color": Back.BLACK},  # Walls.
                         2: {"letter": "C", "color": Back.GREEN},     # Citizen.
                         3: {"letter": " ", "color": Back.WHITE}, # Floor.
                         4: {"letter": "F", "color": Back.YELLOW},   # Fireextinguisher.
-                        5: {"letter": " ", "color": Back.RED}}  # Grabbing to that field
+                        5: {"letter": " ", "color": Back.RED},  # Grabbing to that field
+                        6: {"letter": "H", "color": Back.CYAN}}  # House.
 
 def action_to_gray_position(action, state):
     if action[0] in {5,6,7,8}:
@@ -193,7 +194,7 @@ def visualize_two_part_trajectories(org_traj, cf_traj, start_part, end_part_cf, 
 
 # main function
 if __name__ == '__main__':
-    org_traj, cf_traj = load_trajectory('demonstrations\ppo_demos_v2_75_[0,1].pk')
+    org_traj, cf_traj = load_trajectory('demonstrations\ppo_demos_v2_60_[0.1,1].pk')
 
     init()
     visualize_two_trajectories(org_traj, cf_traj)
