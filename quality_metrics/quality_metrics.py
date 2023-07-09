@@ -25,7 +25,7 @@ def print_prox_val(validity_qc, proximity_qc):
     # correlation between validity and proximity
     print("Correlation validity and proximity: ", np.corrcoef(validity_qc, proximity_qc))
 
-def evaluate_qcs_for_cte(max, org_traj, counterfactual_traj, start, end_org, end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs):
+def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, end_org, end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs):
     best_val = validity_single(org_traj, counterfactual_traj, start, end_cf, end_org)
     best_prox = distance_single(org_traj, counterfactual_traj, start, end_cf, end_org)
     best_crit = critical_state_single(ppo, org_traj['states'][start])

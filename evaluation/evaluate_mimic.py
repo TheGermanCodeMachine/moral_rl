@@ -1,5 +1,8 @@
 import torch
 from scipy.stats import pearsonr, spearmanr
+from sklearn.metrics import r2_score
+from math import sqrt
+import pickle
 
 def print_inputs(inputs, features, model):
     weight = model.weight[0][0].item()
@@ -15,14 +18,20 @@ def print_inputs(inputs, features, model):
     print('bias', round(model.bias[0].item(), 2))
 
 def evaluate_mimic(model, test, labels, print_it=False, worst=False, best=False, features=None):
+    model.eval()
     """Evaluate the model on the test set. Return the mean squared error."""
     loss = torch.nn.MSELoss()
     with torch.no_grad():
         y_pred = model(test).squeeze()
         test_loss = loss(y_pred, labels).item()
+        pred_label_pairs = list(zip(y_pred, labels))
         # Mean Squared Error
         # mean error
         test_mean_error = torch.mean(torch.abs(y_pred - labels)).item()
+        # root mean squared error
+        rmse = sqrt(test_loss)
+        # r2 score
+        r2 = r2_score(labels, y_pred)
         # pearson correlation
         pearson_correlation = pearsonr(y_pred, labels)[0]
         # spearman correlation
@@ -45,5 +54,6 @@ def evaluate_mimic(model, test, labels, print_it=False, worst=False, best=False,
             _, indices = torch.topk(errors, 1, largest=False)
             print("best predictions:", y_pred[indices[0]], "actual:", labels[indices[0]], "error:", errors[indices[0]])
             print_inputs(test[indices[0]], features, model)
-        return test_loss, test_mean_error, pearson_correlation, spearman_correlation
+        
+        return test_loss, test_mean_error, rmse, r2, pearson_correlation, spearman_correlation, pred_label_pairs
     

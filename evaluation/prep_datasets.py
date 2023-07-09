@@ -7,7 +7,7 @@ import extract_reward_features as erf
 import random
 import numpy as np
 from copy import deepcopy
-from utils.util_functions import normalise_values
+from utils.util_functions import normalise_values, iterate_through_folder
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
@@ -34,6 +34,8 @@ def extract_features(trajectories):
         final_number_of_unsaved_citizenss.append(erf.final_number_of_unsaved_citizens(traj))
         moved_towards_closest_citizens.append(erf.moved_towards_closest_citizen(traj))
 
+    average_features = [np.mean(citizens_saveds), np.mean(unsaved_citizenss), np.mean(distance_to_citizens), np.mean(standing_on_extinguishers), np.mean(lengths), np.mean(could_have_saveds), np.mean(final_number_of_unsaved_citizenss), np.mean(moved_towards_closest_citizens)]
+
     # normalise values
     citizens_saveds = normalise_values(citizens_saveds)
     unsaved_citizenss = normalise_values(unsaved_citizenss)
@@ -45,8 +47,7 @@ def extract_features(trajectories):
     moved_towards_closest_citizens = normalise_values(moved_towards_closest_citizens)
 
     all_features = [list(a) for a in zip(citizens_saveds, unsaved_citizenss, distance_to_citizens, standing_on_extinguishers, lengths, could_have_saveds, final_number_of_unsaved_citizenss, moved_towards_closest_citizens)]
-    collect_some_statistics(trajectories, citizens_saveds, unsaved_citizenss, distance_to_citizens, lengths)
-    return all_features
+    return all_features, average_features
 
 def part_trajectories_to_features(base_path, path_org, path_cf=None):
     # Load trajectories.
@@ -54,32 +55,41 @@ def part_trajectories_to_features(base_path, path_org, path_cf=None):
         org_trajs = pickle.load(f)
     
     org_trajectories = [d[0] for d in org_trajs]
-    org_rewards = [d[1] for d in org_trajs]
+    org_rewards = [d[1]/len(d[0]['rewards']) for d in org_trajs]
 
     print('part_orgs')
-    org_features = extract_features(org_trajectories)
-    # calulate_PCA(org_features)
+    org_features, average_org_features = extract_features(org_trajectories)
+    average_org_features.append(np.mean(org_rewards))
+    explained_variance = calulate_PCA(org_features)
+    average_org_features.append(explained_variance)
     org_features = [f + [r] for f,r in zip(org_features, org_rewards)]
-
     # Save features.
-    with open(base_path + '\org_features.pkl', 'wb') as f:
+    with open(base_path + '\org_features_norm3.pkl', 'wb') as f:
         pickle.dump(org_features, f)
     
+    with open(base_path + '\statistics' + '\org_feature_stats.pkl', 'wb') as f:
+        pickle.dump(average_org_features, f)
+
     if path_cf:
         with open(path_cf, 'rb') as f:
             cf_trajs = pickle.load(f)
 
         cf_trajectories = [d[0] for d in cf_trajs]
-        cf_rewards = [d[1] for d in cf_trajs]
+        cf_rewards = [d[1]/len(d[0]['rewards']) for d in cf_trajs]
 
         print('part_cfs')
         # Extract features.
-        cf_features = extract_features(cf_trajectories)
-        # calulate_PCA(cf_features)
+        cf_features, average_cf_features = extract_features(cf_trajectories)
+        average_cf_features.append(np.mean(cf_rewards))
+        explained_variance = calulate_PCA(cf_features)
+        average_cf_features.append(explained_variance)
         cf_features = [f + [r] for f,r in zip(cf_features, cf_rewards)]
         
-        with open(base_path + '\cf_features.pkl', 'wb') as f:
+        with open(base_path + '\cf_features_norm3.pkl', 'wb') as f:
             pickle.dump(cf_features, f)
+
+        with open(base_path + '\statistics' + '\cf_feature_stats.pkl', 'wb') as f:
+            pickle.dump(average_cf_features, f)
 
 
 
@@ -151,26 +161,31 @@ def calulate_PCA(org_features):
     for i in range(1, len(org_features[0])+1):
         pca = PCA(n_components=i)
         pca.fit(org_features)
-        print(i, sum(pca.explained_variance_ratio_))
         explained_variance.append(sum(pca.explained_variance_ratio_))
     plt.plot(explained_variance)
     plt.show()
+    return explained_variance
 
         
 
 
 if __name__ == '__main__':
-    # base_path = 'evaluation\datasets\\100_ablations_3\\baseline'
+    folder_path = 'evaluation\datasets\\100_ablations_3'
 
-    # path_org = base_path + '\org_trajectories.pkl'
-    # path_cf = base_path + '\cf_trajectories.pkl'
-    # path_full = base_path + '\\full_trajectories.pkl'
+    # all_folder_base_paths = iterate_through_folder(folder_path)
+    # all_folder_base_paths.reverse()
 
-    # part_trajectories_to_features(base_path, path_org, path_cf)
-    # full_trajectories_to_features(path_full, base_path)
+    # for base_path in all_folder_base_paths:
 
-    # baseline
-    base_path = 'evaluation\datasets\\100_ablations_3\\baseline'
+        # path_org = base_path + '\org_trajectories.pkl'
+        # path_cf = base_path + '\cf_trajectories.pkl'
+        # path_full = base_path + '\\full_trajectories.pkl'
+
+        # part_trajectories_to_features(base_path, path_org, path_cf)
+        # full_trajectories_to_features(path_full, base_path)
+
+        # baseline
+    base_path = 'evaluation\datasets\\100_ablations_3\\baseline1'
     path_baseline_org = base_path + '\org_random_baselines.pkl'
     path_baseline_cf = base_path + '\\cf_random_baselines.pkl'
 

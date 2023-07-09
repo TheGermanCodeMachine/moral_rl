@@ -14,7 +14,7 @@ def number_of_citizens(state):
 def citizens_saved(traj):
     num_citizens_start = number_of_citizens(traj['states'][0])
     num_citizens_end = number_of_citizens(traj['states'][-1])
-    return num_citizens_start - num_citizens_end
+    return (num_citizens_start - num_citizens_end) / len(traj['rewards'])
 
 # MEASURE: How long is the partial trajectory?
 def length(traj):
@@ -25,14 +25,14 @@ def unsaved_citizens(traj):
     uc = 0
     for state in traj['states']:
         uc += number_of_citizens(state)
-    return uc
+    return uc / len(traj['states'])
 
 # MEASURE: Sums up over all states how close the closest citizen is
 def distance_to_citizen(traj):
     dtc = 0
     for state in traj['states']:
         dtc += distance_to_closest_citizen_state(state)
-    return dtc
+    return dtc / len(traj['states'])
 
 # HELPER: How close is the closest citizen?
 def distance_to_closest_citizen_state(state):
@@ -52,7 +52,7 @@ def standing_on_extinguisher(traj):
     soe = 0
     for state in traj['states']:
         soe += standing_on_extinguisher_state(state)
-    return soe
+    return soe / len(traj['states'])
 
 # HELPER: Is the player standing on an extinguisher?
 def standing_on_extinguisher_state(state):
@@ -65,7 +65,7 @@ def could_have_saved(traj):
     for i in range(len(traj['states'])-1):
         chs += could_have_saved_state(traj['states'][i])
     did_save = citizens_saved(traj)
-    return chs - did_save
+    return (chs - did_save)  / len(traj['states'])
 
 # HELPER: Could the player have saved a citizen in this state?
 def could_have_saved_state(state):
@@ -80,7 +80,7 @@ def could_have_saved_state(state):
 def final_number_of_unsaved_citizens(traj):
     return number_of_citizens(traj['states'][-1])
 
-# MEASURE: Summed up over actions, did the player move closer to a citizen?
+# MEASURE: Summed up over actions, did the player Move closer To a Citizen?
 def moved_towards_closest_citizen(traj):
     diffs = []
     mtc = distance_to_closest_citizen_state(traj['states'][0])

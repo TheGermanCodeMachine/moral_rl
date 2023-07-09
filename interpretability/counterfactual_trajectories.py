@@ -256,10 +256,10 @@ if __name__ == '__main__':
 
     baseline = 'baseline' in config.criteria
 
-    print('Criteria: ', config.criteria)
+    print('Criteria: ', config.criteria, baseline)
     
     # make a random number based on the time
-    random.seed(3)
+    random.seed(5)
     seed_env = random.randint(0, 100000)
     torch.manual_seed(seed_env)
     np.random.seed(seed_env)
@@ -322,13 +322,6 @@ if __name__ == '__main__':
             # visualize only the part of the trajectory that is different
             # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_cfs[max_qc_index],  end_orgs[max_qc_index])
 
-            # add the original trajectory and the counterfactual trajectory to the list of all trajectories
-            all_org_trajs.append(org_traj)
-            all_cf_trajs.append(best_counterfactual_trajectory)
-            all_starts.append(starts[max_qc_index])
-            all_end_orgs.append(end_orgs[max_qc_index])
-            all_end_cfs.append(end_cfs[max_qc_index])
-
             part_org = {'states' : org_traj['states'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
                         'actions': org_traj['actions'][starts[max_qc_index]:end_orgs[max_qc_index]+1],
                         'rewards': org_traj['rewards'][starts[max_qc_index]:end_orgs[max_qc_index]+1]}
@@ -350,13 +343,24 @@ if __name__ == '__main__':
                 lengths_org.append(end_orgs[max_qc_index]+1 - starts[max_qc_index])
                 lengths_cf.append(end_cfs[max_qc_index]+1 - starts[max_qc_index])
                 start_points.append(starts[max_qc_index])
-                best_val, best_prox, best_crit, best_dive = evaluate_qcs_for_cte(max, org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_orgs[max_qc_index], end_cfs[max_qc_index], ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+                best_val, best_prox, best_crit, best_dive = evaluate_qcs_for_cte(org_traj, best_counterfactual_trajectory, starts[max_qc_index], end_orgs[max_qc_index], end_cfs[max_qc_index], ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
                 quality_criteria.append((best_val, best_prox, best_crit, best_dive))
                 effiencies.append(efficiency)
+
+            # add the original trajectory and the counterfactual trajectory to the list of all trajectories
+            all_org_trajs.append(org_traj)
+            all_cf_trajs.append(best_counterfactual_trajectory)
+            all_starts.append(starts[max_qc_index])
+            all_end_orgs.append(end_orgs[max_qc_index])
+            all_end_cfs.append(end_cfs[max_qc_index])
 
         # pick a random counterfactual as the baseline
         if baseline:
             random_cf_index = random.randint(0, len(counterfactual_trajs)-1)
+            random_counterfactual_trajectory = counterfactual_trajs[random_cf_index]
+
+            efficiency = time.time() - time_start
+
             part_random_org = {'states' : org_traj['states'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
                         'actions': org_traj['actions'][starts[random_cf_index]:end_orgs[random_cf_index]+1],
                         'rewards': org_traj['rewards'][starts[random_cf_index]:end_orgs[random_cf_index]+1]}
@@ -368,6 +372,21 @@ if __name__ == '__main__':
                         'rewards': counterfactual_trajs[random_cf_index]['rewards'][starts[random_cf_index]:end_cfs[random_cf_index]+1]}
             random_cf_reward = sum(part_random_cf['rewards'])
             random_baseline_cfs.append((part_random_cf, random_cf_reward))
+
+            if config.measure_statistics:
+                # record stastics
+                lengths_org.append(end_orgs[random_cf_index]+1 - starts[random_cf_index])
+                lengths_cf.append(end_cfs[random_cf_index]+1 - starts[random_cf_index])
+                start_points.append(starts[random_cf_index])
+                best_val, best_prox, best_crit, best_dive = evaluate_qcs_for_cte(org_traj, random_counterfactual_trajectory, starts[random_cf_index], end_orgs[random_cf_index], end_cfs[random_cf_index], ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+                quality_criteria.append((best_val, best_prox, best_crit, best_dive))
+                effiencies.append(efficiency)
+
+            all_org_trajs.append(org_traj)
+            all_cf_trajs.append(random_counterfactual_trajectory)
+            all_starts.append(starts[random_cf_index])
+            all_end_orgs.append(end_orgs[random_cf_index])
+            all_end_cfs.append(end_cfs[random_cf_index])
 
 
     if not baseline:
@@ -408,7 +427,7 @@ if __name__ == '__main__':
                 pickle.dump(effiencies, f)
         
     else:
-        baseline_path = config.base_path + '\\baseline'
+        baseline_path = config.base_path + '\\baseline1'
         if not os.path.exists(baseline_path):
             os.makedirs(baseline_path)
         
@@ -416,3 +435,20 @@ if __name__ == '__main__':
             pickle.dump(random_baseline_cfs, f)
         with open(baseline_path + '\org_random_baselines.pkl', 'wb') as f:
             pickle.dump(random_baseline_orgs, f)
+
+        if config.measure_statistics:
+            # saving statistics
+            # check if folder statistics exists
+            if not os.path.exists(baseline_path + '\statistics'):
+                os.makedirs(baseline_path + '\statistics')
+
+            with open(baseline_path + '\statistics\lengths_org.pkl', 'wb') as f:
+                pickle.dump(lengths_org, f)
+            with open(baseline_path + '\statistics\lengths_cf.pkl', 'wb') as f:
+                pickle.dump(lengths_cf, f)
+            with open(baseline_path + '\statistics\start_points.pkl', 'wb') as f:
+                pickle.dump(start_points, f)
+            with open(baseline_path + '\statistics\quality_criteria.pkl', 'wb') as f:
+                pickle.dump(quality_criteria, f)
+            with open(baseline_path + '\statistics\effiencies.pkl', 'wb') as f:
+                pickle.dump(effiencies, f)

@@ -82,21 +82,29 @@ def iterate_through_folder(folder_path):
     else:
         return [folder_path]
     
-def save_results(to_save, base_path, contrastive, baseline=0, hyper_params=False):
-    path = base_path + "\\results\\"
+def save_results(to_save, base_path, contrastive, baseline=0, type='results'):
+    path = base_path + "\\results_normaliserewardsNN2\\"
     #  if the results folder does not exist, create it
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
 
-    if hyper_params:
+    if type=='hyper_params':
         path += "hyperparameters.pkl"
-    else:
+    elif type=='results':
         # make the file name
         if contrastive: path += "contrastive_learning"
         else: path += "non_contrastive_learning"
         if baseline==2: path += "_random_baseline.pkl"
         elif baseline==0: path += "_counterfactual.pkl"
         else: path += "_no_quality_baseline.pkl"
+    elif type=='model':
+        path += "model.pkl"
+    elif type=='results_ood':
+        if contrastive: path += "contrastive_learning"
+        else: path += "non_contrastive_learning"
+        if baseline==2: path += "_random_baseline_ood.pkl"
+        elif baseline==0: path += "_counterfactual_ood.pkl"
+        else: path += "_no_quality_baseline_ood.pkl"
     # save the results
     with open(path, 'wb') as f:
         pickle.dump(to_save, f)
