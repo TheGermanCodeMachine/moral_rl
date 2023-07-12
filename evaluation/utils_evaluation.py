@@ -2,12 +2,14 @@ import torch
 import matplotlib.pyplot as plt
 import os
 
-def show_loss_plot(train_losses, test_losses, show=True, lr=None, l2=None, base_path=None, epochs=None, save_path=''):
+def show_loss_plot(train_losses, test_losses, show=True, lr=None, l2=None, base_path=None, epochs=None, save_path='', third_graph=None):
 
     # plot the training and test losses on a log scale
     #show labels
     plt.semilogy(test_losses, label='test' + 'lr={} l2={}'.format(lr, l2))
     plt.semilogy(train_losses, label='train' + 'lr={} l2={}'.format(lr, l2), linestyle='--')
+    if isinstance(third_graph, list):
+        plt.semilogy(third_graph, label='test_sin' + 'lr={} l2={}'.format(lr, l2), linestyle='--')
     # add a vertical line at epochs
     if epochs:
         plt.axvline(x=epochs, color='k', linestyle='--')

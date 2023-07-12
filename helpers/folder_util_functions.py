@@ -21,7 +21,7 @@ def iterate_through_folder(folder_path):
     else:
         return [folder_path]
     
-def save_results(to_save, path, contrastive, baseline=0, type='results'):
+def save_results(to_save, path, baseline=0, type='results', data_mixture=(0,1), con=True):
     #  if the results folder does not exist, create it
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
@@ -30,21 +30,21 @@ def save_results(to_save, path, contrastive, baseline=0, type='results'):
         path += "hyperparameters.pkl"
     elif type=='results':
         # make the file name
-        if contrastive: path += "contrastive_learning"
-        else: path += "non_contrastive_learning"
+        if con: path += "contrastive_" 
+        else: path += "single_"
         if baseline==2: path += "_random_baseline.pkl"
         elif baseline==0: path += "_counterfactual.pkl"
         else: path += "_no_quality_baseline.pkl"
     elif type=='model':
         path += "model.pkl"
     elif type=='results_ood':
-        if contrastive: path += "contrastive_learning"
-        else: path += "non_contrastive_learning"
+        if con: path += "contrastive_" 
+        else: path += "single_"
         if baseline==2: path += "_random_baseline_ood.pkl"
         elif baseline==0: path += "_counterfactual_ood.pkl"
         else: path += "_no_quality_baseline_ood.pkl"
     # save the results
-    write(path, to_save)
+    write(to_save, path)
 
 def write(object, path):
     with open(path, 'wb') as f:
