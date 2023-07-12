@@ -6,13 +6,13 @@ import torch
 import os
 import pickle
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
 from matplotlib import pyplot as plt
 from evaluate_mimic import evaluate_mimic
 import sys
 import random
-from utils.util_functions import iterate_through_folder, save_results
+from helpers.folder_util_functions import iterate_through_folder, save_results, read, write
 from copy import deepcopy
+from utils_evaluation import *
 
 class hyperparameters:
     learning_rate = 1e-1
@@ -24,16 +24,27 @@ class hyperparameters:
     
     
 class config:    
+    features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
+    model_type = 'linear' # model_type = 'NN' or 'linear'
+    data_folds = 4
+    results_path = "\\results_normaliserewardsNN2\\" # Foldername to save results to
     print_plot = True
     print_examples = False
     print_weights = False
-    features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
     save_results = True
     print_worst_examples = False
     print_best_examples = False
     save_model = False
-    model_type = 'NN' # Alternative: model_type = 'linear'
-    data_folds = 4
+
+# randomises the order of trajectories, while keeping the pairs of original and counterfactual trajectories together
+# also makes them into tensors
+def shuffle_together(org_trajs, cf_trajs):
+    org_cf_trajs = list(zip(org_trajs, cf_trajs))
+    random.shuffle(org_cf_trajs)
+    org_trajs, cf_trajs = zip(*org_cf_trajs)
+    org_trajs = torch.tensor(org_trajs, dtype=torch.float)
+    cf_trajs = torch.tensor(cf_trajs, dtype=torch.float)
+    return org_trajs, cf_trajs
 
 def train_test_split(org_trajs, cf_trajs, num_features, train_ratio=0.8):
     # randomise the order of the trajectories
@@ -51,106 +62,38 @@ def train_test_split(org_trajs, cf_trajs, num_features, train_ratio=0.8):
     return train, train_labels, test, test_labels
 
 def train_test_split_contrastive(org_trajs, cf_trajs, num_features, train_ratio=0.8):
-    # TODO: this needs to be rewritten
     n_train = int(train_ratio * len(org_trajs))
 
-    # randomise org_trajs and cf_trajs together
-    org_cf_trajs = list(zip(org_trajs, cf_trajs))
-    random.seed(0)
-    random.shuffle(org_cf_trajs)
-    org_trajs, cf_trajs = zip(*org_cf_trajs)
-
-    org_trajs = torch.tensor(org_trajs, dtype=torch.float)
-    cf_trajs = torch.tensor(cf_trajs, dtype=torch.float)
+    org_trajs, cf_trajs = shuffle_together(org_trajs, cf_trajs)
 
     train = org_trajs[:n_train,:num_features] - cf_trajs[:n_train,:num_features]
     train_labels = org_trajs[:n_train,-1] - cf_trajs[:n_train,-1]
-
     test = org_trajs[n_train:,:num_features] - cf_trajs[n_train:,:num_features]
     test_labels = org_trajs[n_train:,-1] - cf_trajs[n_train:,-1]
 
     return train, train_labels, test, test_labels
 
 def train_validation_test_split_contrastive(org_trajs, cf_trajs, num_features, train_ratio=0.6, validation_ratio=0.2):
-    test_ratio = 1 - train_ratio - validation_ratio
     n_train = int(train_ratio * len(org_trajs))
     n_validation = int(validation_ratio * len(org_trajs))
-    n_test = int(test_ratio * len(org_trajs))
 
-    # randomise org_trajs and cf_trajs together
-    org_cf_trajs = list(zip(org_trajs, cf_trajs))
-    random.seed(0)
-    random.shuffle(org_cf_trajs)
-    org_trajs, cf_trajs = zip(*org_cf_trajs)
-
-    org_trajs = torch.tensor(org_trajs, dtype=torch.float)
-    cf_trajs = torch.tensor(cf_trajs, dtype=torch.float)
+    org_trajs, cf_trajs = shuffle_together(org_trajs, cf_trajs)
 
     train = org_trajs[:n_train,:num_features] - cf_trajs[:n_train,:num_features]
     train_labels = org_trajs[:n_train,-1] - cf_trajs[:n_train,-1]
-
     validation = org_trajs[n_train:n_train+n_validation,:num_features] - cf_trajs[n_train:n_train+n_validation,:num_features]
     validation_labels = org_trajs[n_train:n_train+n_validation,-1] - cf_trajs[n_train:n_train+n_validation,-1]
-
     test = org_trajs[n_train+n_validation:,:num_features] - cf_trajs[n_train+n_validation:,:num_features]
     test_labels = org_trajs[n_train+n_validation:,-1] - cf_trajs[n_train+n_validation:,-1]
 
     return train, train_labels, validation, validation_labels, test, test_labels
 
 
-def show_loss_plot(train_losses, test_losses, show=True, lr=None, l2=None, base_path=None, epochs=None):
-    if not config.print_plot:
-        return
-
-    # plot the training and test losses on a log scale
-    #show labels
-    plt.semilogy(test_losses, label='test' + 'lr={} l2={}'.format(lr, l2))
-    plt.semilogy(train_losses, label='train' + 'lr={} l2={}'.format(lr, l2), linestyle='--')
-    # add a vertical line at epochs
-    if epochs:
-        plt.axvline(x=epochs, color='k', linestyle='--')
-    if show:
-        if l2:
-            plt.title('lr', lr)
-        # plt.show()
-        path = base_path + "\\results_normaliserewardsNN2\\"
-        #  if the results folder does not exist, create it
-        if not os.path.exists(os.path.dirname(path)):
-            os.makedirs(os.path.dirname(path))
-        plt.savefig(path + 'loss_plot.png')
-        plt.close()
-
-def print_example_predictions(model, test_set, test_labels):
-    if not config.print_examples:
-        return
-    # print the first 5 predictions
-    with torch.no_grad():
-        y_pred_test = model(test_set).squeeze()
-        for i in range(5):
-            print('features', test_set[i], 'prediction', y_pred_test[i].item(), 'label', test_labels[i].item())
-
-def get_weights(model):
-    weights = [model.weight[0][i].item() for i in range(len(model.weight[0]))]
-    weights.append(model.bias[0].item())
-    # weights = [model.weight[0][0].item(), model.weight[0][1].item(), model.weight[0][2].item(), model.weight[0][3].item(), model.weight[0][4].item(), model.weight[0][5].item(), model.weight[0][6].item(), model.weight[0][7].item(), model.bias[0].item()]
-    if config.print_weights:
-        print('citizens_saved', model.weight[0][0].item())
-        print('unsaved_citizens', model.weight[0][1].item())
-        print('distance_to_citizen', model.weight[0][2].item())
-        print('standing_on_extinguisher', model.weight[0][3].item())
-        print('length', model.weight[0][4].item())
-        print('could_have_saved', model.weight[0][5].item())
-        print('final_number_of_unsaved_citizens', model.weight[0][6].item())
-        print('moved_towards_closest_citizen', model.weight[0][7].item())
-        print('bias', model.bias[0].item())
-    return weights
-
-
 def train_model(train_set, train_labels, test_set, test_labels, num_features, epochs = hyperparameters.epochs_contrastive, learning_rate=hyperparameters.learning_rate, regularisation = hyperparameters.regularisation, num_layers = None, hidden_layer_sizes = None, base_path=None, l2=None, stop_epoch = 0):
 
-    # a linear model with the features as input
+    # Initialise the model (either NN or LM)
     if config.model_type=='NN':
-        # make a list of layer dimensions: num_features, hidden_layer_sizes, 1
+        # make a list of the layer dimensions: num_features, hidden_layer_sizes, 1
         layer_dims = [num_features] + hidden_layer_sizes + [1]
 
         # Initialise the neural network with the number of layers and the hidden_sizes
@@ -160,16 +103,17 @@ def train_model(train_set, train_labels, test_set, test_labels, num_features, ep
             for i in range(1, num_layers-1):
                 model.add_module('relu' + str(i), torch.nn.ReLU())
                 model.add_module('linear' + str(i), torch.nn.Linear(layer_dims[i], layer_dims[i+1]))
+
     elif config.model_type=='linear':
         model = torch.nn.Linear(num_features, 1)
+
     loss_fn = torch.nn.MSELoss(reduction='mean')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularisation)
-    train_losses = []
-    test_losses = []
 
-    stop_train_losses = []
-    stop_test_losses = []
+    train_losses, test_losses, stop_train_losses, stop_test_losses = [], [], [], []
+
     for t in range(epochs):
+        # if we want to stop the training at a certain epoch, save the model and the losses, but continue training until the end
         if t == stop_epoch-1:
             stop_model = deepcopy(model)
             stop_train_losses = deepcopy(train_losses)
@@ -177,30 +121,18 @@ def train_model(train_set, train_labels, test_set, test_labels, num_features, ep
 
         # Forward pass: compute predicted y by passing x to the model.
         y_pred = model(train_set).squeeze()
-
         # Compute and print loss.
-        # mse_looss = loss_fn(y_pred, train_labels)
         loss = loss_fn(y_pred, train_labels)
-        
-        # add l1 regularisation
-        # l1_reg = torch.tensor(0.)
-        # for param in model.parameters():
-        #     l1_reg += torch.sum(torch.abs(param))
-        # loss = mse_loss + regularisation * l1_reg
-
-        # train_losses.append(mse_loss.item())
         train_losses.append(loss.item())
-
         # Before the backward pass, use the optimizer object to zero all of the
         # gradients for the variables it will update (which are the learnable weights of the model)
         optimizer.zero_grad()
-
         # Backward pass: compute gradient of the loss with respect to model parameters
         loss.backward()
-
         # Calling the step function on an Optimizer makes an update to its parameters
         optimizer.step()
 
+        # record the loss at this epoch for the test set
         with torch.no_grad():
             model.eval()
             y_pred_test = model(test_set).squeeze()
@@ -222,22 +154,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0)
     num_layers = None
     hidden_sizes = None
 
-    test_lossess = []
-    train_lossess = []
-    all_train_losses = []
-    test_mean_errors = []
-    test_rmses = []
-    test_r2s = []
-    train_mean_errors = []
-    train_rmses = []
-    pearson_correlations = []
-    spearman_correlations = []
-    weights = []
-    all_test_losses = []
-    epochss = []
-    learning_rates = []
-    regularisations = []
-
+    test_lossess, train_lossess, all_train_losses, test_mean_errors, test_rmses, test_r2s, train_mean_errors, train_rmses, pearson_correlations, spearman_correlations, weights, all_test_losses, epochss, learning_rates, regularisations = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     test_loss_oods, test_mean_error_oods, test_rmse_oods, r2_oods, pearson_correlation_oods, spearman_correlation_oods, pred_label_pairs_oods = [], [], [], [], [], [], []
 
     # load ood test data
@@ -245,19 +162,13 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0)
     path = base_path.split('\\')
     path = '\\'.join(path[:-1])
     # load the data
-    with open(path + '\\baseline1\org_features_norm3.pkl', 'rb') as f:
-        org_features_ood = pickle.load(f)
-    with open(path + '\\baseline1\cf_features_norm3.pkl', 'rb') as f:
-        cf_features_ood = pickle.load(f)
+    org_features_ood = read(path + '\\baseline1\org_features_norm3.pkl')
+    cf_features_ood = read(path + '\\baseline1\cf_features_norm3.pkl')
     test_set_ood, test_labels_ood, _ , _ = train_test_split_contrastive(org_features_ood, cf_features_ood, num_features, train_ratio=1)
 
     if contrastive:
-        if config.model_type=='NN':
-            train_set, train_labels, test_set, test_labels = train_test_split_contrastive(org_features, cf_features, num_features, train_ratio=0.8)
-            epochs, learning_rate, regularisation, num_layers, hidden_sizes =  NN_hyper_param_optimization(train_set, train_labels)
-        else:
-            train_set, train_labels, test_set, test_labels = train_test_split_contrastive(org_features, cf_features, num_features, train_ratio=0.8)
-            epochs, learning_rate, regularisation = hyper_param_optimization(train_set, train_labels)
+        train_set, train_labels, test_set, test_labels = train_test_split_contrastive(org_features, cf_features, num_features, train_ratio=0.8)
+        epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels)
     else:
         train_set, train_labels, test_set, test_labels = train_test_split(org_features, cf_features, num_features, train_ratio=0.6)
 
@@ -277,7 +188,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0)
         pearson_correlations.append(pearson_correlation)
         spearman_correlations.append(spearman_correlation)
         if config.model_type == 'linear':
-            weights.append(get_weights(model))
+            weights.append(get_weights(model, config.print_weights))
         train_lossess.append(train_losses[-1])
         all_train_losses.append(full_train_losses)
         all_test_losses.append(full_test_losses)
@@ -307,16 +218,14 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0)
     print('test r2', np.mean(test_r2s))
     print('pearson correlation', np.mean(pearson_correlations))
     print('spearman correlation', np.mean(spearman_correlations))
-    average_reward = torch.mean(train_labels)
-    print('average reward', average_reward)
-    average_prediction = torch.mean(model(train_set).squeeze())
-    print('average prediction', average_prediction)
+    print('average reward', torch.mean(train_labels))
+    print('average prediction', torch.mean(model(train_set).squeeze()))
     if config.model_type == 'linear':
         weights = np.mean(weights, axis=0)
         print('weights', [v + ": " + str(weights[k]) for k,v in enumerate(config.features) if k < num_features])
     all_train_losses = np.mean(all_train_losses, axis=0)
     all_test_losses = np.mean(all_test_losses, axis=0)
-    show_loss_plot(all_train_losses, all_test_losses, base_path=base_path, epochs=epochs)
+    show_loss_plot(all_train_losses, all_test_losses, show=config.print_plot, save_path=base_path + config.results_path, epochs=epochs)
     print('predicition label pairs', pred_label_pairs)
 
     print('test_loss_ood', np.mean(test_loss_oods))
@@ -331,15 +240,15 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0)
                    'train_mean_errors': train_mean_errors, 'train_rmses': train_rmses, 'test_rmses': test_rmses, 'pearson_correlations': pearson_correlations, 'spearman_correlations': spearman_correlations, 
                    'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses, 'average_reward': average_reward, 'pred_label_pairs': pred_label_pairs, 'average_prediction': average_prediction, 'r2s': test_r2s}
         
-        save_results(to_save, base_path, contrastive, baseline, type='results')
+        save_results(to_save, base_path +  + config.results_path, contrastive, baseline, type='results')
 
         hyper_params = {'epochs': epochss, 'learning_rate': learning_rates, 'l2_regularisation': regularisations}
-        save_results(hyper_params, base_path, contrastive, baseline, type='hyper_params')
+        save_results(hyper_params, base_path + config.results_path, contrastive, baseline, type='hyper_params')
 
         to_save = {'test_losses': test_loss_oods, 'test_mean_errors': test_mean_error_oods, 'test_rmses': test_rmse_oods, 'pearson_correlations': pearson_correlation_oods, 'spearman_correlations': spearman_correlation_oods, 'pred_label_pairs': pred_label_pairs_oods, 'r2s': r2_oods}
-        save_results(to_save, base_path, contrastive, baseline, type='results_ood')
+        save_results(to_save, base_path + config.results_path, contrastive, baseline, type='results_ood')
 
-
+# split the data into k folds to run cross validation on
 def split_for_cross_validation(train_set, train_labels, k=5):
     # split data into k folds
     train_set_folds = []
@@ -350,6 +259,7 @@ def split_for_cross_validation(train_set, train_labels, k=5):
         train_labels_folds.append(train_labels[i*fold_size:(i+1)*fold_size])
     return train_set_folds, train_labels_folds
 
+# from the k-folds of the training data, return the training and validation sets for the kth fold
 def cross_validate(train_set_folds, train_labels_folds, k):
     train_set_f = torch.cat(train_set_folds[:k] + train_set_folds[k+1:])
     train_labels_f = torch.cat(train_labels_folds[:k] + train_labels_folds[k+1:])
@@ -357,7 +267,7 @@ def cross_validate(train_set_folds, train_labels_folds, k):
     validation_labels_f = train_labels_folds[k]
     return train_set_f, train_labels_f, validation_set_f, validation_labels_f
 
-def NN_hyper_param_optimization(train_set, train_labels):
+def hyper_param_optimization(train_set, train_labels):
     # we use 5-fold cross validation to find the best hyper parameters
     data_folds = config.data_folds
     train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
@@ -370,23 +280,22 @@ def NN_hyper_param_optimization(train_set, train_labels):
     best_num_layers = 0
     best_hidden_layer_sizes = []
 
-    # x = [(4, [[4,2], [4,4], [6,3], [6,6], [8,4], [8,8], [10,10]]), (5, [[8,6,4], [10,10,5], [8,8,8]])]
-    x = [(4, [[4,4]])]
-
+    # different NN architectures with (number of layers, hidden layer sizes)
+    if config.model_type == 'NN':
+        # architectures = [(4, [[4,2], [4,4], [6,3], [6,6], [8,4], [8,8], [10,10]]), (5, [[8,6,4], [10,10,5], [8,8,8]])]
+        architectures = [(4, [[4,4]])]
+    else:
+        architectures = [(None, [None])]
     learning_rates = [0.001, 0.01, 0.1, 0.3]
-    # l2_lambdas = [0, 0.001, 0.01, 0.1, 1]
     l2_lambdas = [0, 0.01, 0.1, 1]
 
-    # loop over network architectures
-    for num_layers, hidden_layer_sizes in x:
+    # loop over network architectures (not relevant for the LM)
+    for num_layers, hidden_layer_sizes in architectures:
         for hidden_layer_size in hidden_layer_sizes:
-            # print(num_layers, hidden_layer_size)
-            # best_tmp = 2000000
-
             # loop over hyper parameters
             for lrs in learning_rates:
+                print('learning rate', lrs)
                 for l2 in l2_lambdas:
-
                     # iterate over the k folds for cross validation
                     test_lossess = []
                     for k in range(data_folds):
@@ -407,104 +316,36 @@ def NN_hyper_param_optimization(train_set, train_labels):
                         best_epoch = min_index
                         best_num_layers = num_layers
                         best_hidden_layer_sizes = hidden_layer_size
-                    # if min_test_loss < best_tmp:
-                    #     best_tmp = min_test_loss
-            # print(best_tmp, num_layers, hidden_layer_size)
             # plt.legend()
             # plt.show()
-    print(best_loss, best_epoch, best_lr, best_l2, best_hidden_layer_sizes, best_num_layers)
-    # return 2000, best_lr, best_l2, best_num_layers, best_hidden_layer_sizes
+    if config.model_type == 'NN':
+        print(best_loss, best_epoch, best_lr, best_l2, best_hidden_layer_sizes, best_num_layers)
+    else:
+        print(best_loss, best_epoch, best_lr, best_l2)
     return best_epoch, best_lr, best_l2, best_num_layers, best_hidden_layer_sizes
 
-
-def hyper_param_optimization(train_set, train_labels):
-    # we use 5-fold cross validation to find the best hyper parameters
-    data_folds = config.data_folds
-    train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
-
-    # epochs = [1000, 2000, 3000, 5000]
-    # learning_rates = [0.001, 0.003, 0.01, 0.03, 0.1, 0.3]
-    # l1_lambdas = [0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 0.5, 1]
-
-    learning_rates = [0.001, 0.01, 0.1, 0.3]
-    # l2_lambdas = [0, 0.001, 0.01, 0.1, 1]
-    l2_lambdas = [0, 0.01, 0.1, 1]
-    # learning_rates = [0.1]
-    # l2_lambdas = [0]
-
-
-    num_features = len(train_set[0])
-
-    best_loss = 100000000
-    best_epoch = 0
-    best_lr = 0
-    best_l2 = 0
-
-    for lrs in learning_rates:
-        for l2 in l2_lambdas:
-
-            # iterate over the k folds for cross validation
-            test_lossess = []
-            for k in range(data_folds):
-                train_set_f, train_labels_f, validation_set_f, validation_labels_f = cross_validate(train_set_folds, train_labels_folds, k)
-                model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features, hyperparameters.epochs_contrastive, lrs, regularisation=l2)
-                test_lossess.append(test_losses)
-
-            avg_test_losses = np.mean(test_lossess, axis=0)
-            min_test_loss = min(avg_test_losses)
-            # show_loss_plot(avg_test_losses, show=False, lr=lrs, l2=l2)
-            min_test_loss = min(test_losses)
-            if min_test_loss < best_loss:
-                best_loss = min_test_loss
-                best_lr = lrs
-                best_l2 = l2
-                best_epoch = test_losses.index(min_test_loss)
-        # plt.legend()#
-        # plt.show()
-    print(best_loss, best_epoch, best_lr, best_l2)
-    # return 2000, best_lr, best_l2
-    return best_epoch, best_lr, best_l2
-
 if __name__ == '__main__':
-    folder_path = 'evaluation\datasets\\100_ablations_3'
+    folder_path = 'datasets\\100_ablations_3'
 
     # if there is an argument in the console
-    # if len(sys.argv) > 1:
-    #     folder_path = sys.argv[1]
+    if len(sys.argv) > 1:
+        folder_path = sys.argv[1]
 
-    # all_folder_base_paths = iterate_through_folder(folder_path)
-    # all_folder_base_paths.reverse()
+    all_folder_base_paths = iterate_through_folder(folder_path)
+    all_folder_base_paths.reverse()
 
-    # for base_path in all_folder_base_paths:
-    #     print(base_path)
-    #     path_org_cte = base_path + '\org_features_norm3.pkl'
-    #     path_cf_cte = base_path + '\cf_features_norm3.pkl'
-    #     path_org_baseline = base_path + '\org_features_baseline.pkl'
-    #     path_cf_baseline = base_path + '\cf_features_baseline.pkl'
+    for base_path in all_folder_base_paths:
+        print(base_path)
+        path_org_cte = base_path + '\org_features_norm3.pkl'
+        path_cf_cte = base_path + '\cf_features_norm3.pkl'
 
-    #     # contrastive learning
-    #     print('# COUNTERFACTUAL Contrastive Learning')
-    #     learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=0)
-    #     print('-------------------------')
-    #     print('# BASELINE Contrastive Learning')
-    #     learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=True, baseline=2)
-    #     print('-------------------------')
-        # print('# BASELINE Non-Contrastive Learning')
-        # learning_repeats(path_org_baseline, path_cf_baseline, base_path, contrastive=False, baseline=2)
-        # print('-------------------------')
-        # print('# COUNTERFACTUAL Non-Contrastive Learning')
-        # learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=False, baseline=0)
-
-        # print('\n')
-
-    # remove all letters from the folder path starting from the last backslash (going up one folder)
-    base_path_root = folder_path + '\\baseline'
-    path_org_no_quality = base_path_root + '\org_features_norm3.pkl'
-    path_cf_no_quality = base_path_root + '\cf_features_norm3.pkl'
-
-    print('-------------------------')
-    print('# NO QUALITY Contrastive Learning')
-    learning_repeats(path_org_no_quality, path_cf_no_quality, base_path_root, contrastive=True, baseline=1)
-    # print('-------------------------')
-    # print('# NO QUALITY Non-Contrastive Learning')
-    # learning_repeats(path_org_no_quality, path_cf_no_quality, base_path_root, contrastive=False, baseline=1)
+        # see if base_path contains 'baseline'
+        if 'baseline' in base_path:
+            print('# BASELINE Contrastive Learning')
+            learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=1)
+            continue
+        else:
+            print('# COUNTERFACTUAL Contrastive Learning')
+            learning_repeats(path_org_cte, path_cf_cte, base_path, contrastive=True, baseline=0)
+        print('-------------------------')
+        print('\n')

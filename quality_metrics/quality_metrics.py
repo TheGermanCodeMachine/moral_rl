@@ -5,7 +5,7 @@ sys.path.append(str(adjacent_folder))
 from copy import deepcopy
 import numpy as np
 import time
-from utils.util_functions import *
+from helpers.util_functions import *
 from quality_metrics.validity_measures import validity_all as validity
 from quality_metrics.validity_measures import validity_single
 from quality_metrics.distance_measures import distance_all as distance
@@ -15,15 +15,7 @@ from quality_metrics.diversity_measures import diversity_single
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
 from quality_metrics.critical_state_measures import critical_state_single
 
-def print_prox_val(validity_qc, proximity_qc):
-    for i in range(len(validity_qc)):
-        print("i: ", i, "Validity: ", validity_qc[i], " Proximity: ", proximity_qc[i], "sum: ", validity_qc[i] - proximity_qc[i])
-    # average validity and proximity
-    print("Average validity: ", np.mean(validity_qc), " Average proximity: ", np.mean(proximity_qc))
-    # variance of validity and proximity
-    print("Variance validity: ", np.var(validity_qc), " Variance proximity: ", np.var(proximity_qc))
-    # correlation between validity and proximity
-    print("Correlation validity and proximity: ", np.corrcoef(validity_qc, proximity_qc))
+weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5}
 
 def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, end_org, end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs):
     best_val = validity_single(org_traj, counterfactual_traj, start, end_cf, end_org)
@@ -32,21 +24,17 @@ def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, end_org, end_cf, 
     best_div = diversity_single(org_traj, counterfactual_traj, start, end_cf, end_org, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
     return best_val, best_prox, best_crit, best_div
 
-#NOTE: currently i am only using proximity and validity
 def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, criteria_to_use):
-    # alpha determines how much to prioritise similarity of trajectories or difference in outputs
-    weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5}
 
-    validity_qc = None
-    proximity_qc = None
-    critical_state_qc = None
-    diversity_qc = None
+    validity_qc, proximity_qc, critical_state_qc, diversity_qc = None, None, None, None
 
     qc_values = [(x, 0) for x in range(len(counterfactual_rewards))]
     if 'validity' in criteria_to_use:
         validity_qc = validity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
         validity_qc = normalise_values(validity_qc)
+        # multiply by weight
         validity_qc = [val * weight['validity'] for val in validity_qc]
+        # add to qc_values
         qc_values = [(x, qc_values[x][1] + validity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'proximity' in criteria_to_use:
         proximity_qc = distance(org_traj, counterfactual_trajs, starts, end_cfs,end_orgs)
@@ -58,14 +46,15 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
         critical_state_qc = normalise_values(critical_state_qc)
         critical_state_qc = [val * weight['critical_state'] for val in critical_state_qc]
         qc_values = [(x, qc_values[x][1] + critical_state_qc[x]) for x in range(len(counterfactual_rewards))]
-    # print_prox_val(validity_qc, proximity_qc)
-    # Now we only take the 25% of counterfactuals that perform best on the validity, proximity and critical state metrics and compute diversity for them to save computational time
+    # sort the qc_values in descending order
     qc_values.sort(key=lambda x: x[1], reverse=True)
 
     if 'diversity' in criteria_to_use:
         # Now we only take the 25% of counterfactuals that perform best on the validity, proximity and critical state metrics and compute diversity for them to save computational time
         # pick the  25% best ones
         best_qc_values = qc_values[:int(len(qc_values)/4)]
+        if all([x[1] for x in qc_values] == 0):
+            best_qc_values = qc_values[:int(len(qc_values))]
         #get the indices of the best ones
         best_cfs_indices = [x[0] for x in best_qc_values]
         # get the best counterfactuals
@@ -97,5 +86,4 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
         # # print("diverstiy_qc", max(diversity_qc), "validity_qc", max(validity_qc), "proximity_qc", max(proximity_qc), "critical_state_qc", max(critical_state_qc)
 
     max_index = qc_values[0][0]
-
     return max_index

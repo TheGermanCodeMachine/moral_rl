@@ -1,0 +1,9 @@
+States in the environment are stored as a list of matrices, where each matrix has the positions of one type of object.
+
+In randomized_v2 the objects contained are:
+- Matrix 0: borders of the environment
+- Matrix 1: the player
+- Matrix 2: citizens
+- Matrix 3: unused
+- Matrix 4: fire extinguisher
+- Matrix 5: houses

@@ -3,35 +3,21 @@ from pathlib import Path
 adjacent_folder = Path(__file__).parent.parent
 sys.path.append(str(adjacent_folder))
 from tqdm import tqdm
-from moral.ppo import PPO, TrajectoryDataset, update_policy
+from moral.ppo import PPO
 import torch
 from moral.airl import *
 from moral.active_learning import *
 import numpy as np
-import matplotlib.pyplot as plt
 from envs.gym_wrapper import *
 from moral.preference_giver import *
-from utils.evaluate_ppo import evaluate_ppo
-import argparse
 import sys
-from create_data_interp import *
 import tensorflow as tf
-from linear_regression import *
-import helper
 from copy import *
-from statistics import mean
-from utils.visualize_trajectory import visualize_two_trajectories, visualize_two_part_trajectories
-from utils.util_functions import *
+from helpers.util_functions import *
 import random 
 import time
-from quality_metrics.quality_metrics import measure_quality
-from quality_metrics.diversity_measures import diversity_all
-from quality_metrics.validity_measures import validity_all as validity
-from quality_metrics.critical_state_measures import critical_state_all as critical_state
-from quality_metrics.distance_measures import distance_all as distance_all
-from copy import deepcopy
 import pickle
-import evaluation.extract_reward_features as erf
+import evaluation.reward_features as erf
 
 class config:
     env_id= 'randomized_v2'

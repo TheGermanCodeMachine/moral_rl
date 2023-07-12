@@ -5,9 +5,10 @@ sys.path.append(str(adjacent_folder))
 
 import numpy as np
 import torch
-from utils.util_functions import state_action_diff, distance_subtrajectories, extract_player_position, normalise_values
-from quality_metrics.distance_measures import my_distance
+from helpers.util_functions import extract_player_position, normalise_values, partial_trajectory
+from quality_metrics.distance_measures import my_distance, distance_subtrajectories, state_action_diff
 
+# global variable to store the rotated trajectories (so they don't have to be recalculated every time)
 ROTATED_TRAJ = None
 
 # inputs:
@@ -46,13 +47,13 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     # print("length_div: ", length_div, "start_time_div: ", start_time_div, "start_state_div: ", start_state_div)
     return length_div, start_time_div, start_state_div # + trajectory_div_org + trajectory_div_cf
 
-def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_traj_orgs, prev_traj_cfs, prev_starts, prev_ends_cf, prev_ends_org):
+def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     if len(prev_starts) == 0:
         return [0 for x in range(len(end_cfs))]
     iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_traj = [{'states': prev_traj_orgs[x]['states'][prev_starts[x]:prev_ends_org[x]+1], 'actions': prev_traj_orgs[x]['actions'][prev_starts[x]:prev_ends_org[x]+1], 'rewards': prev_traj_orgs[x]['rewards'][prev_starts[x]:prev_ends_org[x]+1]} for x in iterate_prev]
-    prev_cf_traj = [{'states': prev_traj_cfs[x]['states'][prev_starts[x]:prev_ends_cf[x]+1], 'actions': prev_traj_cfs[x]['actions'][prev_starts[x]:prev_ends_cf[x]+1], 'rewards': prev_traj_cfs[x]['rewards'][prev_starts[x]:prev_ends_cf[x]+1]} for x in iterate_prev]
+    prev_org_traj = [partial_trajectory(prev_org_trajs, prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
+    prev_cf_traj = [partial_trajectory(prev_cf_trajs, prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
 
     # make a list of all the previous original and counterfactual trajectories and their rotations
     all_prev_traj = prev_org_traj.copy()
@@ -71,15 +72,15 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_traj_orgs,
     start_state_divs = normalise_values(start_state_divs)
     return length_divs + start_time_divs + start_state_divs
 
-def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_traj_orgs, prev_traj_cfs, prev_starts, prev_ends_cf, prev_ends_org):
+def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     # BUG: This is not normalised in the same way as the diversity_all function. THus it leads to different results.
     # TODO: Fix this
     if len(prev_starts) == 0:
         return 0
     iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_traj = [{'states': prev_traj_orgs[x]['states'][prev_starts[x]:prev_ends_org[x]+1], 'actions': prev_traj_orgs[x]['actions'][prev_starts[x]:prev_ends_org[x]+1], 'rewards': prev_traj_orgs[x]['rewards'][prev_starts[x]:prev_ends_org[x]+1]} for x in iterate_prev]
-    prev_cf_traj = [{'states': prev_traj_cfs[x]['states'][prev_starts[x]:prev_ends_cf[x]+1], 'actions': prev_traj_cfs[x]['actions'][prev_starts[x]:prev_ends_cf[x]+1], 'rewards': prev_traj_cfs[x]['rewards'][prev_starts[x]:prev_ends_cf[x]+1]} for x in iterate_prev]
+    prev_org_traj = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
+    prev_cf_traj = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
     all_prev_traj = prev_org_traj.copy()
     all_prev_traj.extend(prev_cf_traj)
     all_rotated_trajs = [t for x in all_prev_traj for t in rotated_trajectories(x)]
@@ -141,12 +142,12 @@ def state_diversity(state, action, prev_states, prev_actions):
 # this method helps to rotate the actions of a trajectory
 # num_rotations: 0->0°, 1->90°, 2->180°, 3->270°
 def map_action(action, num_rotations):
-    grab_actions = [5,7,6,8]
+    interact_actions = [5,7,6,8]
     walk_action = [0,2,1,3] 
     if action == 4: return 4
-    if action in grab_actions: 
-        index = (grab_actions.index(action) + num_rotations) % 4
-        return np.array(grab_actions[index], dtype=np.int64)
+    if action in interact_actions: 
+        index = (interact_actions.index(action) + num_rotations) % 4
+        return np.array(interact_actions[index], dtype=np.int64)
     if action in walk_action:
         index = (walk_action.index(action) + num_rotations) % 4
         return np.array(walk_action[index], dtype=np.int64)

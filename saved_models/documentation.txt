@@ -1,0 +1,7 @@
+This file contains saved models where  v2 and v3 indicate that they were trained on environment randomized_v2 or randomized_v3
+[x,y] indicates the preferences between the two objectives that they were trained on
+
+Some of these models were trained before or after the pycolab bug (standing on citizen makes the citizen disappear) was removed.
+
+Only the models for v2 with the preferences [0.1,10], [0.3,10] and [1,10] were trained without the bug
+I currently use [1,10]

@@ -115,7 +115,7 @@ def get_statistics(data):
     output = {'efficiencies': efficiencies, 'lengths_cf': lengths_cf, 'lengths_org': lengths_org, 'quality_criteria': quality_criteria, 'start_points': start_points, 'org_feature_stats': org_feature_stats, 'cf_feature_stats': cf_feature_stats}
     return output
 
-base_path = "evaluation\datasets\\100_ablations_3"
+base_path = "datasets\\100_ablations_3"
 
 model_type = 'LM' # 'LM' or 'NN2'
 
@@ -148,130 +148,47 @@ for folder in os.listdir(base_path):
     results_ood.append(get_results_ood(results_data_ood))
     statistics.append(get_statistics(statistics_path))
 
-# print the results
+def print_header():
+    print('& no qc & critical & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
+    print('& & state & & & validity & validity & validity & validity & \\\\')
+    print('& & & & & & critical & critical state & diversity & \\\\')
+    print('& & & & & & state & diversity & & \\\\')
+    print('\hline')   
 
-# print the results as a latex table
-# the top head should include all the options
-# the left side should include test_mean_error, spearman correlation and pearson correlation
+def print_table_body(factors, values, data, iterate=False):
+    for i in range(len(factors)):
+        if iterate:
+            print(factors[i] + " & " + " & ".join([str(round(x[values][i], 2)) for x in data]) + "\\\\")
+        else:
+            print(factors[i] + " & " + " & ".join([str(round(x[values[i]], 2)) for x in data]) + "\\\\")
+    print("\hline")
 
 print('----------------results measures ----------------')
-# print each item in options seperated by an &
-print('& no qc & critical & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
-print('& & state & & & validity & validity & validity & validity & \\\\')
-print('& & & & & & critical & critical state & diversity & \\\\')
-print('& & & & & & state & diversity & & \\\\')
-# print each item in results seperated by an &
-print('\hline')
+print_header()
 print('\\textbf{Test measures:}\\\\')
-print("mean error \downarrow & " + " & ".join([str(round(result['test_mean_errors'], 2)) for result in results]) + "\\\\")
-print("rmse \downarrow & " + " & ".join([str(round(result['test_rmse'], 2)) for result in results]) + "\\\\")
-print("r2 \\uparrow & " + " & ".join([str(round(result['r2'], 2)) for result in results]) + "\\\\")
-print("spearman \\uparrow & " + " & ".join([str(round(result['spearman_correlations'], 2)) for result in results]) + "\\\\")
-print("pearson \\uparrow & " + " & ".join([str(round(result['pearson_correlations'], 2)) for result in results]) + "\\\\")
-print("\hline")
+factors = ["mean error \downarrow", "rmse \downarrow", "r2 \\uparrow", "spearman \\uparrow", "pearson \\uparrow"]
+values = ['test_mean_errors', 'test_rmse', 'r2', 'spearman_correlations', 'pearson_correlations']
+print_table_body(factors, values, results)
+
 print('\\textbf{Test measures ood:}\\\\')
-print("mean error \downarrow & " + " & ".join([str(round(result['test_mean_errors'], 2)) for result in results_ood]) + "\\\\")
-print("rmse \downarrow & " + " & ".join([str(round(result['test_rmse'], 2)) for result in results_ood]) + "\\\\")
-print("r2 \\uparrow & " + " & ".join([str(round(result['r2'], 2)) for result in results_ood]) + "\\\\")
-print("spearman \\uparrow & " + " & ".join([str(round(result['spearman_correlations'], 2)) for result in results_ood]) + "\\\\")
-print("pearson \\uparrow & " + " & ".join([str(round(result['pearson_correlations'], 2)) for result in results_ood]) + "\\\\")
-print("\hline")
+factors = ["mean error \downarrow", "rmse \downarrow", "r2 \\uparrow", "spearman \\uparrow", "pearson \\uparrow"]
+values = ['test_mean_errors', 'test_rmse', 'r2', 'spearman_correlations', 'pearson_correlations']
+print_table_body(factors, values, results_ood)
+
 print("\\textbf{Statistics:}\\\\")
-print("efficiencies \downarrow & " + " & ".join([str(round(statistic['efficiencies'], 2)) for statistic in statistics]) + "\\\\")
-print("lengths cf & " + " & ".join([str(round(statistic['lengths_cf'], 2)) for statistic in statistics]) + "\\\\")
-print("lengths org & " + " & ".join([str(round(statistic['lengths_org'], 2)) for statistic in statistics]) + "\\\\")
-print("start points & " + " & ".join([str(round(statistic['start_points'], 2)) for statistic in statistics]) + "\\\\")
-print("\hline")
+factors = ["efficiencies \downarrow", "lengths_cf", "lengths_org", "start points"]
+values = ['efficiencies', 'lengths_cf', 'lengths_org', 'start_points']
+print_table_body(factors, values, statistics)
+
 print("\\textbf{Quality criteria:}\\\\")
-print("validity \\uparrow & " + " & ".join([str(round(statistic['quality_criteria'][0], 2)) for statistic in statistics]) + "\\\\")
-print("proximity \downarrow & " + " & ".join([str(round(statistic['quality_criteria'][1], 2)) for statistic in statistics]) + "\\\\")
-print("critical state \\uparrow & " + " & ".join([str(round(statistic['quality_criteria'][2], 2)) for statistic in statistics]) + "\\\\")
-print("diversity \\uparrow & " + " & ".join([str(round(statistic['quality_criteria'][3], 2)) for statistic in statistics]) + "\\\\")
-print("\hline")
-# print("Learned weights:\\\\")
-# print("citizens saved & " + " & ".join([str(round(weight['citizens_saved'], 2)) for weight in weights]) + "\\\\")
-# print("unsaved citizens & " + " & ".join([str(round(weight['unsaved_citizens'], 2)) for weight in weights]) + "\\\\")
-# print("distance to citizen & " + " & ".join([str(round(weight['distance_to_citizen'], 2)) for weight in weights]) + "\\\\")
-# print("standing on extinguisher & " + " & ".join([str(round(weight['standing_on_extinguisher'], 2)) for weight in weights]) + "\\\\")
-# print("length & " + " & ".join([str(round(weight['length'], 2)) for weight in weights]) + "\\\\")
-# print("could have saved & " + " & ".join([str(round(weight['could_have_saved'], 2)) for weight in weights]) + "\\\\")
-# print("final number of unsaved citizens & " + " & ".join([str(round(weight['final_number_of_unsaved_citizens'], 2)) for weight in weights]) + "\\\\")
-# print("moved towards closest citizen & " + " & ".join([str(round(weight['moved_towards_closest_citizen'], 2)) for weight in weights]) + "\\\\")
-# print("bias & " + " & ".join([str(round(weight['bias'], 2)) for weight in weights]) + "\\\\")
-# print('\hline')
+factors = ["validity \\uparrow", "proximity \downarrow", "critical state \\uparrow", "diversity \\uparrow"]
+values = 'quality_criteria'
+print_table_body(factors, values, statistics, True)
+
 print("\\textbf{Feature values:}\\\\")
-print("citizens saved & " + " & ".join([str(round(statistic['cf_feature_stats'][0], 2)) for statistic in statistics]) + "\\\\")
-print("unsaved citizens & " + " & ".join([str(round(statistic['cf_feature_stats'][1], 2)) for statistic in statistics]) + "\\\\")
-print("distance to citizen & " + " & ".join([str(round(statistic['cf_feature_stats'][2], 2)) for statistic in statistics]) + "\\\\")
-print("standing on extinguisher & " + " & ".join([str(round(statistic['cf_feature_stats'][3], 2)) for statistic in statistics]) + "\\\\")
-print("length & " + " & ".join([str(round(statistic['cf_feature_stats'][4], 2)) for statistic in statistics]) + "\\\\")
-print("could have saved & " + " & ".join([str(round(statistic['cf_feature_stats'][5], 2)) for statistic in statistics]) + "\\\\")
-print("final number of unsaved citizens & " + " & ".join([str(round(statistic['cf_feature_stats'][6], 2)) for statistic in statistics]) + "\\\\")
-print("moved towards closest citizen & " + " & ".join([str(round(statistic['cf_feature_stats'][7], 2)) for statistic in statistics]) + "\\\\")
-print("reward & " + " & ".join([str(round(statistic['cf_feature_stats'][8], 2)) for statistic in statistics]) + "\\\\")
-
-# print('\n')
-# print('----------------statistics ----------------')
-# print(" & " + " & ".join(options_full) + "\\\\")
-# print('& critical state & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
-# print('& & & & validity & validity & validity & validity & \\\\')
-# print('& & & & & critical state & critical state & diversity & \\\\')
-# print('& & & & & & diversity & & \\\\')
-# # print each item in results seperated by an &
-# print("efficiencies & " + " & ".join([str(round(statistic['efficiencies'], 2)) for statistic in statistics]) + "\\\\")
-# print("lengths cf & " + " & ".join([str(round(statistic['lengths_cf'], 2)) for statistic in statistics]) + "\\\\")
-# print("lengths org & " + " & ".join([str(round(statistic['lengths_org'], 2)) for statistic in statistics]) + "\\\\")
-# print("start_points & " + " & ".join([str(round(statistic['start_points'], 2)) for statistic in statistics]) + "\\\\")
-
-# print('\n')
-# print('----------------quality criterias ----------------')
-# print(" & " + " & ".join(options_full) + "\\\\")
-# print('& critical state & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
-# print('& & & & validity & validity & validity & validity & \\\\')
-# print('& & & & & critical state & critical state & diversity & \\\\')
-# print('& & & & & & diversity & & \\\\')
-# # print each item in results seperated by an &
-# print("validity & " + " & ".join([str(round(statistic['quality_criteria'][0], 2)) for statistic in statistics]) + "\\\\")
-# print("proximity & " + " & ".join([str(round(statistic['quality_criteria'][1], 2)) for statistic in statistics]) + "\\\\")
-# print("critical state & " + " & ".join([str(round(statistic['quality_criteria'][2], 2)) for statistic in statistics]) + "\\\\")
-# print("diversity & " + " & ".join([str(round(statistic['quality_criteria'][3], 2)) for statistic in statistics]) + "\\\\")
-
-
-# print('\n')
-# print('----------------weights ----------------')
-# print(" & " + " & ".join(options_full) + "\\\\")
-# print('& critical state & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
-# print('& & & & validity & validity & validity & validity & \\\\')
-# print('& & & & & critical state & critical state & diversity & \\\\')
-# print('& & & & & & diversity & & \\\\')
-# # print each item in results seperated by an &
-# print("citizens saved & " + " & ".join([str(round(weight['citizens_saved'], 2)) for weight in weights]) + "\\\\")
-# print("unsaved citizens & " + " & ".join([str(round(weight['unsaved_citizens'], 2)) for weight in weights]) + "\\\\")
-# print("distance to citizen & " + " & ".join([str(round(weight['distance_to_citizen'], 2)) for weight in weights]) + "\\\\")
-# print("standing on extinguisher & " + " & ".join([str(round(weight['standing_on_extinguisher'], 2)) for weight in weights]) + "\\\\")
-# print("length & " + " & ".join([str(round(weight['length'], 2)) for weight in weights]) + "\\\\")
-# print("could have saved & " + " & ".join([str(round(weight['could_have_saved'], 2)) for weight in weights]) + "\\\\")
-# print("final number of unsaved citizens & " + " & ".join([str(round(weight['final_number_of_unsaved_citizens'], 2)) for weight in weights]) + "\\\\")
-# print("moved towards closest citizen & " + " & ".join([str(round(weight['moved_towards_closest_citizen'], 2)) for weight in weights]) + "\\\\")
-# print("bias & " + " & ".join([str(round(weight['bias'], 2)) for weight in weights]) + "\\\\")
-
-# print('\n')
-# print('----------------feature values ----------------')
-# print(" & " + " & ".join(options_full) + "\\\\")
-# print('& critical state & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
-# print('& & & & validity & validity & validity & validity & \\\\')
-# print('& & & & & critical state & critical state & diversity & \\\\')
-# print('& & & & & & diversity & & \\\\')
-# # print each item in results seperated by an &
-# print("citizens saved & " + " & ".join([str(round(statistic['cf_feature_stats'][0], 2)) for statistic in statistics]) + "\\\\")
-# print("unsaved citizens & " + " & ".join([str(round(statistic['cf_feature_stats'][1], 2)) for statistic in statistics]) + "\\\\")
-# print("distance to citizen & " + " & ".join([str(round(statistic['cf_feature_stats'][2], 2)) for statistic in statistics]) + "\\\\")
-# print("standing on extinguisher & " + " & ".join([str(round(statistic['cf_feature_stats'][3], 2)) for statistic in statistics]) + "\\\\")
-# print("length & " + " & ".join([str(round(statistic['cf_feature_stats'][4], 2)) for statistic in statistics]) + "\\\\")
-# print("could have saved & " + " & ".join([str(round(statistic['cf_feature_stats'][5], 2)) for statistic in statistics]) + "\\\\")
-# print("final number of unsaved citizens & " + " & ".join([str(round(statistic['cf_feature_stats'][6], 2)) for statistic in statistics]) + "\\\\")
-# print("moved towards closest citizen & " + " & ".join([str(round(statistic['cf_feature_stats'][7], 2)) for statistic in statistics]) + "\\\\")
-# print("reward & " + " & ".join([str(round(statistic['cf_feature_stats'][8], 2)) for statistic in statistics]) + "\\\\")
+factors = ['citizens saved', 'unsaved citizens', 'distance to citizen', 'standing on extinguisher', 'length', 'could have saved', 'final number of unsaved citizens', 'moved towards closest citizen', 'reward']
+values = 'cf_feature_stats'
+print_table_body(factors, values, statistics, True)
 
 
 print('\n')
@@ -313,19 +230,19 @@ print('spearman, pearson', pearsonr([result['spearman_correlations'] for result 
 
 
 print('----------------graphics----------------\n')
-p = pickle.load(open('evaluation\datasets\\100_ablations_3\p100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
+p = pickle.load(open('datasets\\100_ablations_3\p100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
 p_me = p['test_mean_errors']
 p_r2 = p['r2s']
 p_spear = load_and_get_rid_of_nans(p, 'spearman_correlations')
-v = pickle.load(open('evaluation\datasets\\100_ablations_3\\v100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
+v = pickle.load(open('datasets\\100_ablations_3\\v100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
 v_me = v['test_mean_errors']
 v_r2 = v['r2s']
 v_spear = load_and_get_rid_of_nans(v, 'spearman_correlations')
-pvcd = pickle.load(open('evaluation\datasets\\100_ablations_3\\pvcd100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
+pvcd = pickle.load(open('datasets\\100_ablations_3\\pvcd100\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
 pvcd_me = pvcd['test_mean_errors']
 pvcd_r2 = pvcd['r2s']
 pvcd_spear = load_and_get_rid_of_nans(pvcd, 'spearman_correlations')
-noqc = pickle.load(open('evaluation\datasets\\100_ablations_3\\baseline\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
+noqc = pickle.load(open('datasets\\100_ablations_3\\baseline\\results_normaliserewards' +  model_type + '\contrastive_learning_counterfactual.pkl', 'rb'))
 noqc_me = noqc['test_mean_errors']
 noqc_r2 = noqc['r2s']
 noqc_spear = load_and_get_rid_of_nans(noqc, 'spearman_correlations')

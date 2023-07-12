@@ -44,7 +44,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "evaluation\\datasets\\100_ablations",
+                "datasets\\100_ablations",
             ]
         },
 
