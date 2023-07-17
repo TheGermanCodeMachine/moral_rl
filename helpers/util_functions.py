@@ -25,6 +25,15 @@ def normalise_values(values):
     normalised_values = ((values - mean) / std).tolist()
     return  normalised_values
 
+# normalise values to [0,1]
+def normalise_values_01(values):
+    if np.all([v==0 for v in values]):
+        return values
+    minv = values - np.min(values)
+    diff = np.max(values) - np.min(values)
+    norm = minv / diff
+    return (values - np.min(values)) / (np.max(values) - np.min(values))
+
 # returns a partial trajectory from start to end (inclusive)
 def partial_trajectory(full_traj, start, end):
     return {'states' : full_traj['states'][start:end+1],

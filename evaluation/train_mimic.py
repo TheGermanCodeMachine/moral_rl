@@ -25,9 +25,9 @@ class hyperparameters:
     
 class config:    
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
-    model_type = 'linear' # model_type = 'NN' or 'linear'
+    model_type = 'NN' # model_type = 'NN' or 'linear'
     data_folds = 4
-    results_path = "\\results_mixedLM\\" # Foldername to save results to
+    results_path = "\\results_mixedNN\\" # Foldername to save results to
     print_plot = False
     print_examples = False
     print_weights = False

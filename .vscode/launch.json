@@ -55,9 +55,6 @@
             "program": "${workspaceFolder}/interpretability/counterfactual_trajectories.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": [
-                "b",
-            ]
         },
 
 
