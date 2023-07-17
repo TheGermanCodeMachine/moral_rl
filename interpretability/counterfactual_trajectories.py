@@ -42,9 +42,9 @@ class config:
     max_steps = 75
     base_path = '.\datasets\\100_ablations_3\\'
     measure_statistics = True
-    num_runs = 100
-    # criteria = ['validity', 'diversity', 'proximity', 'critical_state']
-    criteria = ['validity']
+    num_runs = 5
+    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    # criteria = ['validity']
     
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
 
     all_org_trajs, all_cf_trajs, all_starts, all_end_orgs, all_end_cfs, all_part_orgs, all_part_cfs, all_full_orgs, random_baseline_cfs, random_baseline_orgs = [], [], [], [], [], [], [], [], [], []
-    lengths_org, lengths_cf, start_points, quality_criteria, effiencies = [], [], [], [], []
+    lengths_org, lengths_cf, start_points, quality_criteria, effiencies, qc_statistics = [], [], [], [], [], []
 
     # load the original trajectories
     org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl.pkl', 'rb'))
@@ -215,7 +215,8 @@ if __name__ == '__main__':
 
         if not baseline:
             # use the quality criteria to determine the best counterfactual trajectory
-            sort_index = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
+            sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
+            qc_statistics.append(qc_stats)
         else:
             # use a random baseline to determine the best counterfactual trajectory
             sort_index = random.randint(0, len(counterfactual_trajs)-1)
@@ -225,7 +226,7 @@ if __name__ == '__main__':
         efficiency = time.time() - time_start
 
         # uncomment below if the trajectories should be visualized:
-        # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[sort_index], end_cfs[sort_index],  end_orgs[sort_index])
+        visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[sort_index], end_cfs[sort_index],  end_orgs[sort_index])
 
         part_org = partial_trajectory(org_traj, starts[sort_index], end_orgs[sort_index])
         part_rewards = sum(part_org['rewards'])
@@ -292,3 +293,5 @@ if __name__ == '__main__':
             pickle.dump(quality_criteria, f)
         with open(path_folder + '\statistics\effiencies.pkl', 'wb') as f:
             pickle.dump(effiencies, f)
+        with open(path_folder + '\statistics\qc_statistics.pkl', 'wb') as f:
+            pickle.dump(qc_statistics, f)

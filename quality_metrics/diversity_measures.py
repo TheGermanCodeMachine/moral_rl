@@ -40,7 +40,7 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
 
     # This makes the code super inefficient because it causes thousands of calls to the state_action_diff function
     # part_traj1 = {'states': traj1['states'][start:end_org+1], 'actions': traj1['actions'][start:end_org+1], 'rewards': traj1['rewards'][start:end_org+1]}
-    # part_traj2 = {'states': traj2['states'][start:end_cf+1], 'actions': traj2['actions'][start:end_cf+1], 'rewards': traj2['rewards'][start:end_cf+1]}
+    # part_traj2 = {'states': traj2['states'][start:end_cf+1], 'actions': traj2['actions'][start:end_cf+1], 'rewards': traj2['rewards'][start:end_cf+1]}s
     # trajectory_div_org = part_traj_diversity(part_traj1, all_rotated_trajs)
     # trajectory_div_cf = part_traj_diversity(part_traj2, all_rotated_trajs)
 
@@ -52,8 +52,8 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
         return [0 for x in range(len(end_cfs))]
     iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_traj = [partial_trajectory(prev_org_trajs, prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
-    prev_cf_traj = [partial_trajectory(prev_cf_trajs, prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
+    prev_org_traj = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
+    prev_cf_traj = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
 
     # make a list of all the previous original and counterfactual trajectories and their rotations
     all_prev_traj = prev_org_traj.copy()
@@ -70,7 +70,7 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
     length_divs = normalise_values(length_divs)
     start_time_divs = normalise_values(start_time_divs)
     start_state_divs = normalise_values(start_state_divs)
-    return length_divs + start_time_divs + start_state_divs
+    return [length_divs[i] + start_time_divs[i] + start_state_divs[i] for i in range(len(length_divs))]
 
 def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     # BUG: This is not normalised in the same way as the diversity_all function. THus it leads to different results.
@@ -136,7 +136,7 @@ def state_diversity(state, action, prev_states, prev_actions):
         return 0
     else:
         #TODO: This implementation just picks the distance to the closest state-action pair (nearest neighbor). Anothe option would be to take the average distance to the k nearest neighbors.
-        diff = [state_action_diff(state, action, prev_states[x], prev_actions[x]) for x in range(len(prev_states))]
+        diff = [state_action_diff(state, action, prev_states[x], prev_actions[x])[0] for x in range(len(prev_states))]
         return min(diff)
     
 # this method helps to rotate the actions of a trajectory
