@@ -136,7 +136,7 @@ def state_diversity(state, action, prev_states, prev_actions):
         return 0
     else:
         #TODO: This implementation just picks the distance to the closest state-action pair (nearest neighbor). Anothe option would be to take the average distance to the k nearest neighbors.
-        diff = [state_action_diff(state, action, prev_states[x], prev_actions[x])[0] for x in range(len(prev_states))]
+        diff = [state_action_diff(state, action, prev_states[x], prev_actions[x]) for x in range(len(prev_states))]
         return min(diff)
     
 # this method helps to rotate the actions of a trajectory

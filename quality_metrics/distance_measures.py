@@ -51,26 +51,13 @@ def distance_subtrajectories(traj1, traj2):
     act_diffs, cit_divs, pos_divs = np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states'])))
     for i in range(len(traj1['states'])):
         for j in range(len(traj2['states'])):
-            dist_table[i,j], act_diffs[i,j], cit_divs[i,j], pos_divs[i,j] = state_action_diff(traj1['states'][i], traj1['actions'][i], traj2['states'][j], traj2['actions'][j])
+            dist_table[i,j] = state_action_diff(traj1['states'][i], traj1['actions'][i], traj2['states'][j], traj2['actions'][j])
 
     dist_A_B = np.mean(np.min(dist_table, axis=1))
     dist_B_A = np.mean(np.min(dist_table, axis=0))
     deviation = 0.05*len((traj1['states'])) + 0.05*len((traj2['states']))
-    # if dist_A_B > dist_B_A:
-    #     indices = np.argmin(dist_table, axis=1)
-    #     indices0 = np.argmin(dist_table, axis=0)
-    #     # get the act_diffs at the indices
-    #     act_div = np.mean([act_diffs[i, indices[i]] for i in range(act_diffs.shape[0])])
-    #     cit_div = np.mean([cit_divs[i, indices[i]] for i in range(act_diffs.shape[0])])
-    #     pos_div = np.mean([pos_divs[i, indices[i]] for i in range(act_diffs.shape[0])])
-    # else:
-    #     indices = np.argmin(dist_table, axis=0)
-    #     act_div = np.mean([act_diffs[indices[i], i] for i in range(act_diffs.shape[1])])
-    #     cit_div = np.mean([cit_divs[indices[i], i] for i in range(act_diffs.shape[1])])
-    #     pos_div = np.mean([pos_divs[indices[i], i] for i in range(act_diffs.shape[1])])
-    # print(round(max(dist_A_B, dist_B_A)+deviation,1), round(act_div,1), round(cit_div,1), round(pos_div,1), round(deviation,1), round(len((traj1['states']))))
-    # keyboard.read_event()
     sum = max(dist_A_B, dist_B_A) + deviation
+
     # take log of sum
     return np.log(sum)
 
@@ -80,15 +67,11 @@ def state_action_diff(s1, a1, s2, a2):
     dist = 0
     # add 1 if the action is different
     if a1 != a2: dist += 0.5
-    if a1 != a2: act_div = 0.5 
-    else: act_div = 0
     # add the edit distance between the two matrices of unsaved citizens
     dist += np.sum(np.abs(s1[0][2] - s2[0][2]).detach().numpy())
-    cit_div = np.sum(np.abs(s1[0][2] - s2[0][2]).detach().numpy())
 
     # manhattan distance between the player positions
     pos_1 = extract_player_position(s1)
     pos_2 = extract_player_position(s2)
     dist += (abs(pos_1[0] - pos_2[0]) + abs(pos_1[1] - pos_2[1]))*1.5
-    pos_div = abs(pos_1[0] - pos_2[0]) + abs(pos_1[1] - pos_2[1])*1.5
-    return dist, act_div, cit_div, pos_div
+    return dist
