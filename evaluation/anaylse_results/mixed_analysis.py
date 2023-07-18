@@ -8,7 +8,7 @@ import numpy as np
 from helpers.folder_util_functions import read, write
 from tabulate import tabulate
 
-base_path = "datasets\\100_ablations_3\\pvcd100\\results_mixedNN\\"
+base_path = "datasets\\100_ablations_3\\pvcd100\\results_mixedLM\\"
 data_sin_01 = read(base_path + "0,1\single__counterfactual.pkl")
 data_sin_052 = read(base_path + "0.5,1\single__counterfactual.pkl")
 data_sin_0251 = read(base_path + "0.25,1\single__counterfactual.pkl")

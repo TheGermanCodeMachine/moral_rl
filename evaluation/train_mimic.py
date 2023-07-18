@@ -92,19 +92,13 @@ def train_validation_test_split_contrastive(org_trajs, cf_trajs, num_features, t
 def train_test_split_mixed(org_trajs, cf_trajs, num_features, train_ratio=0.8, data_mixture=(1,0)):
     n_train = int(train_ratio * len(org_trajs))
 
-    train_con, train_labels_con, test_con, test_labels_con = train_test_split_contrastive(org_trajs, cf_trajs, num_features, train_ratio)
-    train_sin, train_labels_sin, test_sin, test_labels_sin = train_test_split_single(org_trajs, cf_trajs, num_features, train_ratio)
+    train_con, train_labels_con, test_con, test_labels_con = train_test_split_contrastive(org_trajs, cf_trajs, num_features, train_ratio*data_mixture[0])
+    train_sin, train_labels_sin, test_sin, test_labels_sin = train_test_split_single(org_trajs, cf_trajs, num_features, train_ratio*data_mixture[1])
 
-    n_single = int(data_mixture[1] * len(train_sin))
-    n_contrastive = int(data_mixture[0] * len(train_con))
-    train = np.concatenate((train_sin[:n_single], train_con[:n_contrastive]))
-    labels = np.concatenate((train_labels_sin[:n_single], train_labels_con[:n_contrastive]))
-    train_set, train_labels = shuffle_together(train, labels)
-
-    return train_set, train_labels, test_con, test_labels_con, test_sin, test_labels_sin
+    return train_con, train_labels_con, train_sin, train_labels_sin, test_con, test_labels_con, test_sin, test_labels_sin
 
 
-def train_model(train_set, train_labels, test_set_con, test_labels_con, test_set_sin=None, test_labels_sin=None, num_features=8, epochs = hyperparameters.epochs_contrastive, learning_rate=hyperparameters.learning_rate, regularisation = hyperparameters.regularisation, num_layers = None, hidden_layer_sizes = None, base_path=None, l2=None, stop_epoch = 0):
+def train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin=torch.tensor([]), train_labels_sin=torch.tensor([]), test_set_sin=None, test_labels_sin=None, num_features=8, epochs = hyperparameters.epochs_contrastive, learning_rate=hyperparameters.learning_rate, regularisation = hyperparameters.regularisation, num_layers = None, hidden_layer_sizes = None, base_path=None, l2=None, stop_epoch = 0, data_mixture=(1,0)):
 
     # Initialise the model (either NN or LM)
     if config.model_type=='NN':
@@ -122,29 +116,38 @@ def train_model(train_set, train_labels, test_set_con, test_labels_con, test_set
     elif config.model_type=='linear':
         model = torch.nn.Linear(num_features, 1)
 
-    loss_fn = torch.nn.MSELoss(reduction='mean')
+    loss_fn = torch.nn.MSELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularisation)
 
-    train_losses, test_losses_con, test_losses_sin, stop_train_losses, stop_test_losses_con, stop_test_losses_sin = [], [], [], [], [], []
+    train_losses, train_losses_sin, weighted_train_losses, test_losses_con, test_losses_sin, stop_train_losses, stop_train_losses_sin, stop_test_losses_con, stop_test_losses_sin = [], [], [], [], [], [], [], [], []
 
     for t in range(epochs):
         # if we want to stop the training at a certain epoch, save the model and the losses, but continue training until the end
         if t == stop_epoch-1:
             stop_model = deepcopy(model)
             stop_train_losses = deepcopy(train_losses)
+            stop_train_losses_sin = deepcopy(train_losses_sin)
             stop_test_losses_con = deepcopy(test_losses_con)
             stop_test_losses_sin = deepcopy(test_losses_sin)
 
         # Forward pass: compute predicted y by passing x to the model.
         y_pred = model(train_set).squeeze()
-        # Compute and print loss.
+        y_pred_sin = model(train_set_sin).squeeze()
+        # Compute and print loss for the contrastive and the single trajectories
         loss = loss_fn(y_pred, train_labels)
-        train_losses.append(loss.item())
+        loss_sin = loss_fn(y_pred_sin, train_labels_sin)
+        loss_weighted = loss
+        loss_weighted_sin = loss_sin/40
+        train_losses.append(loss_weighted.item()*data_mixture[0])
+        train_losses_sin.append(loss_weighted_sin.item()*data_mixture[1])
+
+        weighted_loss = loss_weighted + loss_weighted_sin
+        weighted_train_losses.append(weighted_loss.item())
         # Before the backward pass, use the optimizer object to zero all of the
         # gradients for the variables it will update (which are the learnable weights of the model)
         optimizer.zero_grad()
         # Backward pass: compute gradient of the loss with respect to model parameters
-        loss.backward()
+        weighted_loss.backward()
         # Calling the step function on an Optimizer makes an update to its parameters
         optimizer.step()
 
@@ -161,17 +164,29 @@ def train_model(train_set, train_labels, test_set_con, test_labels_con, test_set
                 test_losses_sin.append(loss.item())
             model.train()
     
+    fig, ax = plt.subplots()
+    ax.plot(train_losses, label='train loss con')
+    ax.plot(train_losses_sin, label='train loss sin')
+    # ax.plot(test_losses_con, label='test loss con')
+    ax.plot(weighted_train_losses, label='weighted train loss')
+    # ax.plot(test_losses_sin, label='test loss sin')
+    ax.set_xlabel('epoch')
+    plt.title('Losses' + str(data_mixture[0]) + ', ' + str(data_mixture[1]) + 'lr:' + str(learning_rate))
+    plt.legend()
+    plt.show()
+
+
     model.eval()
     if stop_epoch != 0:
         stop_model.eval()
         if test_set_sin != None:
-            return stop_model, train_losses, test_losses_con, test_losses_sin, stop_train_losses, stop_test_losses_con, stop_test_losses_sin
+            return stop_model, train_losses, train_losses_sin, test_losses_con, test_losses_sin, stop_train_losses, stop_train_losses_sin, stop_test_losses_con, stop_test_losses_sin
         else:
-            return stop_model, train_losses, test_losses_con, stop_train_losses, stop_test_losses_con
+            return stop_model, train_losses, train_losses_sin, test_losses_con, stop_train_losses, stop_train_losses_sin, stop_test_losses_con
     if test_set_sin != None:
-        return model, train_losses, test_losses_con, test_losses_sin, None, None, None
+        return model, train_losses, train_losses_sin, test_losses_con, test_losses_sin, None, None, None
     else:
-        return model, train_losses, test_losses_con
+        return model, train_losses, train_losses_sin, test_losses_con
 
 def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1,0)):
     org_features = pickle.load(open(path_org, 'rb'))
@@ -197,12 +212,12 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     test_set_ood_con, test_labels_ood_con, _ , _ = train_test_split_contrastive(org_features_ood, cf_features_ood, num_features, train_ratio=1)
     test_set_ood_sin, test_labels_ood_sin, _ , _ = train_test_split_single(org_features_ood, cf_features_ood, num_features, train_ratio=1)
 
-    train_set, train_labels, test_set_con, test_labels_con, test_set_sin, test_labels_sin = train_test_split_mixed(org_features, cf_features, num_features, train_ratio=0.8, data_mixture=data_mixture)
-    epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels)
+    train_set, train_labels, train_set_sin, train_labels_sin, test_set_con, test_labels_con, test_set_sin, test_labels_sin = train_test_split_mixed(org_features, cf_features, num_features, train_ratio=0.8, data_mixture=data_mixture)
+    epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture)
 
     for repeat in range(hyperparameters.number_of_seeds):
         # train the model (works for both, the linear and NN model)
-        model, full_train_losses, full_test_losses_con, full_test_losses_sin, train_losses, test_losses_con, test_losses_sin = train_model(train_set, train_labels, test_set_con, test_labels_con, test_set_sin, test_labels_sin, num_features, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation, num_layers=num_layers, hidden_layer_sizes=hidden_sizes)
+        model, full_train_losses, full_train_losses_sin, full_test_losses_con, full_test_losses_sin, train_losses, train_losses_sin, test_losses_con, test_losses_sin = train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin, train_labels_sin, test_set_sin, test_labels_sin, num_features, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation, num_layers=num_layers, hidden_layer_sizes=hidden_sizes, data_mixture=data_mixture)
 
         # here we test on the left out test set
         test_loss_con, test_mean_error_con, test_rmse_con, r2_con, pearson_correlation_con, spearman_correlation_con, pred_label_pairs_con = evaluate_mimic(model, test_set_con, test_labels_con, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
@@ -305,28 +320,39 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
         save_results(to_save, results_path, baseline, type='results_ood', data_mixture=data_mixture, con=False)
 
 # split the data into k folds to run cross validation on
-def split_for_cross_validation(train_set, train_labels, k=5):
+def split_for_cross_validation(train_set, train_labels, train_set_sin=[], train_labels_sin=[], k=5):
     # split data into k folds
     train_set_folds = []
     train_labels_folds = []
+    train_set_folds_sin = []
+    train_labels_folds_sin = []
     fold_size = int(len(train_set) / k)
+    fold_size_sin = int(len(train_set_sin) / k)
     for i in range(k):
         train_set_folds.append(train_set[i*fold_size:(i+1)*fold_size])
         train_labels_folds.append(train_labels[i*fold_size:(i+1)*fold_size])
-    return train_set_folds, train_labels_folds
+        train_set_folds_sin.append(train_set_sin[i*fold_size_sin:(i+1)*fold_size_sin])
+        train_labels_folds_sin.append(train_labels_sin[i*fold_size_sin:(i+1)*fold_size_sin])
+    return train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin
 
 # from the k-folds of the training data, return the training and validation sets for the kth fold
-def cross_validate(train_set_folds, train_labels_folds, k):
+def cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin, k):
+    train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin = [], [], [], []
     train_set_f = torch.cat(train_set_folds[:k] + train_set_folds[k+1:])
     train_labels_f = torch.cat(train_labels_folds[:k] + train_labels_folds[k+1:])
     validation_set_f = train_set_folds[k]
     validation_labels_f = train_labels_folds[k]
-    return train_set_f, train_labels_f, validation_set_f, validation_labels_f
+    if train_set_folds_sin != []:
+        train_set_f_sin = torch.cat(train_set_folds_sin[:k] + train_set_folds_sin[k+1:])
+        train_labels_f_sin = torch.cat(train_labels_folds_sin[:k] + train_labels_folds_sin[k+1:])
+        validation_set_f_sin = train_set_folds_sin[k]
+        validation_labels_f_sin = train_labels_folds_sin[k]
+    return train_set_f, train_labels_f, validation_set_f, validation_labels_f, torch.tensor(train_set_f_sin), train_labels_f_sin, torch.tensor(validation_set_f_sin), validation_labels_f_sin
 
-def hyper_param_optimization(train_set, train_labels):
+def hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture=(1,0)):
     # we use 5-fold cross validation to find the best hyper parameters
     data_folds = config.data_folds
-    train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
+    train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin = split_for_cross_validation(train_set, train_labels, train_set_sin, train_labels_sin, k=data_folds)
 
     num_features = len(train_set[0])
     best_loss = 100000000
@@ -342,7 +368,8 @@ def hyper_param_optimization(train_set, train_labels):
         # architectures = [(4, [[4,4]])]
     else:
         architectures = [(None, [None])]
-    learning_rates = [0.001, 0.01, 0.1, 0.3]
+    # learning_rates = [0.001, 0.01, 0.1, 0.3]
+    learning_rates = [0.1, 0.3]
     l2_lambdas = [0, 0.01, 0.1, 1]
 
     # loop over network architectures (not relevant for the LM)
@@ -356,8 +383,8 @@ def hyper_param_optimization(train_set, train_labels):
                     # iterate over the k folds for cross validation
                     test_lossess = []
                     for k in range(data_folds):
-                        train_set_f, train_labels_f, validation_set_f, validation_labels_f = cross_validate(train_set_folds, train_labels_folds, k)
-                        model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features=num_features, epochs=hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size)
+                        train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin = cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin, k)
+                        model, train_losses, train_losses_sin, test_losses, _ , _, _, _= train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin, num_features=num_features, epochs=hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size, data_mixture=data_mixture)
                         test_lossess.append(test_losses)
 
                     # show_loss_plot(train_losses, test_losses, show=False, lr=lrs, l2=l2)
@@ -420,7 +447,7 @@ def experiment_for_single_folder():
     path_org_cte = folder_path + '\org_features_norm3.pkl'
     path_cf_cte = folder_path + '\cf_features_norm3.pkl'
 
-    data_mixtures = [(1,0), (1,0.25), (1,0.5), (1,0.75), (1,1), (0.75,1), (0.5,1), (0.25,1), (0,1)]
+    data_mixtures = [(0.5,1), (1,0.25), (1,0), (1,0.5), (1,0.75), (1,1), (0.75,1), (0.25,1), (0,1)]
     for data_mixture in data_mixtures:
         print('# MIXTURE: ', data_mixture)
         learning_repeats(path_org_cte, path_cf_cte, folder_path, baseline=0, data_mixture=data_mixture)
