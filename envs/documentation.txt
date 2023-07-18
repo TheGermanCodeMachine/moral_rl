@@ -7,3 +7,15 @@ In randomized_v2 the objects contained are:
 - Matrix 3: unused
 - Matrix 4: fire extinguisher
 - Matrix 5: houses
+
+actions:
+- 0: go upwards
+- 1: go downwards
+- 2: go left
+- 3: go right
+- 4: do nothing
+- 5: grab upwards
+- 6: grab downwards
+- 7: grab left
+- 8: grab right
+- 9: quit game

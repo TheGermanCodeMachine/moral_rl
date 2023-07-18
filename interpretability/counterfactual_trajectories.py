@@ -42,7 +42,7 @@ class config:
     max_steps = 75
     base_path = '.\datasets\\100_ablations_3\\'
     measure_statistics = True
-    num_runs = 5
+    num_runs = 100
     criteria = ['validity', 'diversity', 'proximity', 'critical_state']
     # criteria = ['validity']
     
@@ -77,6 +77,31 @@ def retrace_original(start, divergence, counterfactual_traj, org_traj, vec_env_c
         states_tensor = torch.tensor(states).float().to(device)
     return counterfactual_traj, states_tensor
 
+# this tests that the states of the original and counterfactual are actually different after the deviation has been taken
+def test_same_next_state(states_tensor, next_state, org_action, cf_action):
+    # option 1 for difference: any of them takes a step (this guarantees different states since they can't take the same step)
+    if org_action in [0,1,2,3] or cf_action in [0,1,2,3]:
+        return False
+    # option 2 for difference: a citizen has been grabbed in the original
+    if count_citizens(states_tensor) != count_citizens(next_state):
+        return False
+    # option 3: a citizen will be grabbed in the counterfactual
+    pp = extract_player_position(states_tensor)
+    if cf_action == 5:
+        if states_tensor[0][2][pp[0]][pp[1]+1] == 1:
+            return False
+    elif cf_action == 6:
+        if states_tensor[0][2][pp[0]][pp[1]-1] == 1:
+            return False
+    elif cf_action == 7:
+        if states_tensor[0][2][pp[0]+1][pp[1]] == 1:
+            return False
+    elif cf_action == 8:
+        if states_tensor[0][2][pp[0]-1][pp[1]] == 1:
+            return False
+    return True
+    
+
 def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
     # Now we make counterfactual trajectories by changing one action at a time and see how the reward changes
 
@@ -103,7 +128,10 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
         counterfactual_traj['states'].append(states_tensor)
         reward = discriminator.g(states_tensor)[0][0].item()
         counterfactual_traj['rewards'].append(reward)
-        counterfact_action, log_probs = ppo.pick_another_action(states_tensor, org_traj['actions'][step])
+        same_next_state = True
+        while same_next_state:
+            counterfact_action, log_probs = ppo.pick_another_action(states_tensor, org_traj['actions'][step])
+            same_next_state = test_same_next_state(states_tensor, org_traj['states'][step+1], org_traj['actions'][step], counterfact_action)
         # take the best action that is not the same as the original action
         # remove the action which is the same as the orignal action
         counterfactual_traj['actions'].append(counterfact_action)
@@ -172,7 +200,7 @@ if __name__ == '__main__':
     print('Criteria: ', config.criteria, baseline)
     
     # make a random number based on the time
-    random.seed(5)
+    random.seed(4)
     seed_env = random.randint(0, 100000)
     torch.manual_seed(seed_env)
     np.random.seed(seed_env)

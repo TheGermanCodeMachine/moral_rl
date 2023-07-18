@@ -27,9 +27,13 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     
     # calculate the diversity of start and end states
 
-    prev_first_states = [i['states'][0] for i in prev_org_traj]
-    prev_first_actions = [i['actions'][0] for i in prev_org_traj]
-    start_state_div = state_diversity(traj1["states"][start], traj1["actions"][start], prev_first_states, prev_first_actions)
+    all_prev_first_states = [i['states'][0] for i in all_rotated_trajs]
+    all_prev_first_actions = [i['actions'][0] for i in all_rotated_trajs]
+    start_state_div = state_diversity(traj1["states"][start], traj1["actions"][start], all_prev_first_states, all_prev_first_actions)
+
+    org_traj = partial_trajectory(traj1, start, end_org)
+    cf_traj = partial_trajectory(traj2, start, end_cf)
+    up_down_div = up_down_diversity(org_traj, cf_traj, prev_org_traj, prev_cf_traj)
     # prev_last_states = [i['states'][-1] for i in prev_org_traj]
     # prev_last_actions = [i['actions'][-1] for i in prev_org_traj]
     # end_state_div = state_diversity(traj1['states'][end_org], traj1['actions'][end_org], prev_last_states, prev_last_actions)
@@ -45,32 +49,36 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     # trajectory_div_cf = part_traj_diversity(part_traj2, all_rotated_trajs)
 
     # print("length_div: ", length_div, "start_time_div: ", start_time_div, "start_state_div: ", start_state_div)
-    return length_div, start_time_div, start_state_div # + trajectory_div_org + trajectory_div_cf
+    return length_div, start_time_div, up_down_div # + trajectory_div_org + trajectory_div_cf
 
 def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     if len(prev_starts) == 0:
         return [0 for x in range(len(end_cfs))]
     iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_traj = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
-    prev_cf_traj = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
+    prev_org_trajs = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
+    prev_cf_trajs = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
 
     # make a list of all the previous original and counterfactual trajectories and their rotations
-    all_prev_traj = prev_org_traj.copy()
-    all_prev_traj.extend(prev_cf_traj)
-    all_rotated_trajs = [t for x in all_prev_traj for t in rotated_trajectories(x)]
+    all_prev_trajs = prev_org_trajs.copy()
+    all_prev_trajs.extend(prev_cf_trajs)
+    all_rotated_trajs = [t for x in all_prev_trajs for t in rotated_trajectories(x)]
     length_divs = []
     start_time_divs = []
-    start_state_divs = []
+    up_down_divs = []
     for x in range(len(end_cfs)):
-        length_div, start_time_div, start_state_div = diversity(org_traj, cf_trajs[x], starts[x], end_cfs[x], end_orgs[x], prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
+        length_div, start_time_div, up_down_div = diversity(org_traj, cf_trajs[x], starts[x], end_cfs[x], end_orgs[x], prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
         length_divs.append(length_div)
         start_time_divs.append(start_time_div)
-        start_state_divs.append(start_state_div)
-    length_divs = normalise_values(length_divs)
-    start_time_divs = normalise_values(start_time_divs)
-    start_state_divs = normalise_values(start_state_divs)
-    return [length_divs[i] + start_time_divs[i] + start_state_divs[i] for i in range(len(length_divs))]
+        up_down_divs.append(up_down_div)
+    # length_divs = normalise_values(length_divs)
+    # start_time_divs = normalise_values(start_time_divs)
+    # start_state_divs = normalise_values(start_state_divs)
+    log_length_divs = [np.log(i) if i != 0 else 0 for i in length_divs]
+    log_start_time_divs = [np.log(i) if i != 0 else 0 for i in start_time_divs]
+
+    sum = [log_length_divs[i] + log_start_time_divs[i] + up_down_divs[i] for i in range(len(length_divs))]
+    return sum
 
 def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     # BUG: This is not normalised in the same way as the diversity_all function. THus it leads to different results.
@@ -90,6 +98,25 @@ def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_org_trajs, 
     
     
 
+def up_down_diversity(org_traj, cf_traj, prev_org_trajs, prev_cf_trajs):
+    # calculate the average rewards
+    org_rewards = np.mean(org_traj['rewards'])
+    cf_rewards = np.mean(cf_traj['rewards'])
+    diff = org_rewards - cf_rewards
+
+    # calculate the average rewards of the previous trajectories
+    prev_org_rewards = [np.mean(x['rewards']) for x in prev_org_trajs]
+    prev_cf_rewards = [np.mean(x['rewards']) for x in prev_cf_trajs]
+    # calculate the difference between org and cf for the previous trajectories
+    prev_diff = [prev_org_rewards[x] - prev_cf_rewards[x] for x in range(len(prev_org_rewards))]
+    # count how many prev_diffs are positive and negative (downwards and upwards counterfactuals)
+    down = len([x for x in prev_diff if x >= 0])
+    up = len([x for x in prev_diff if x < 0])
+    # if the current cf is a downwards cf
+    if diff >= 0:
+        return up / (down + up)
+    else:
+        return down / (down + up)
 
 def length_diversity(dev, prev_dev):
     # pick out the 3 values in prev_dev that are closest to dev
@@ -136,6 +163,11 @@ def state_diversity(state, action, prev_states, prev_actions):
         return 0
     else:
         #TODO: This implementation just picks the distance to the closest state-action pair (nearest neighbor). Anothe option would be to take the average distance to the k nearest neighbors.
+        diff = []
+        for x in range(len(prev_states)):
+            sad = state_action_diff(state, action, prev_states[x], prev_actions[x])
+            # check if the fire-extinguisher is in the usual position (7,7) in the rotated previous state. If not, apply a penalty to the similarity
+            if state[0][4][7][7] != prev_states[x][0][4][7][7]: sad += 1
         diff = [state_action_diff(state, action, prev_states[x], prev_actions[x]) for x in range(len(prev_states))]
         return min(diff)
     

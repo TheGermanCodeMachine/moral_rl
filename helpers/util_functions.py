@@ -7,13 +7,18 @@ def extract_player_position(state):
         pos_tensor = np.argwhere(state[1] == 1).squeeze(0)
     return pos_tensor[0][0].item(), pos_tensor[1][0].item()
 
-
 def extract_citizens_positions(state):
     if len(state[0]==1):
         pos_tensor = np.argwhere(state[0][2] == 1).squeeze(0)
     else:
         pos_tensor = np.argwhere(state[2] == 1).squeeze(0)
     return pos_tensor[0], pos_tensor[1]
+
+def count_citizens(state):
+    if len(state[0]==1):
+        return np.sum(state[0][2])
+    else:
+        return np.sum(state[2])
 
 def normalise_values(values):
     values = np.array(values)
