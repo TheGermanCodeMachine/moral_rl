@@ -32,7 +32,7 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    num_runs = 100
+    num_runs = 1000
 
 def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
      # create one trajectory with ppo
@@ -99,5 +99,5 @@ if __name__ == '__main__':
         original_trajectories_and_seeds.append((org_traj, seed_env))
 
     # save the original trajectories
-    with open('demonstrations/original_trajectories_new_maxsteps75_airl.pkl', 'wb') as f:
+    with open('demonstrations/original_trajectories_new_maxsteps75_airl_1000.pkl', 'wb') as f:
         pickle.dump(original_trajectories_and_seeds, f)

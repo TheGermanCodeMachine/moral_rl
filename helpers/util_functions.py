@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 def extract_player_position(state):
     if len(state[0]==1):
@@ -16,7 +17,7 @@ def extract_citizens_positions(state):
 
 def count_citizens(state):
     if len(state[0]==1):
-        return np.sum(state[0][2])
+        return torch.sum(state[0][2], dim=(0,1))
     else:
         return np.sum(state[2])
 

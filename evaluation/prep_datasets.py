@@ -50,12 +50,12 @@ def part_trajectories_to_features(base_path, path_org, path_cf):
 
     org_features, average_org_features = extract_features(org_trajectories)
     average_org_features.append(np.mean(org_rewards))
-    explained_variance = calulate_PCA(org_features)
+    # explained_variance = calulate_PCA(org_features)
     org_features = [f + [r] for f,r in zip(org_features, org_rewards)]
 
     # Save features.
-    write(base_path + '\org_features_norm3.csv', org_features)
-    write(base_path + '\statistics' + '\org_feature_stats.pkl', average_org_features)
+    write(org_features, base_path + '\org_features.pkl')
+    write(average_org_features, base_path + '\statistics' + '\org_feature_stats.pkl')
 
     print('part_cfs')
     cf_trajs = read(path_cf)
@@ -65,11 +65,11 @@ def part_trajectories_to_features(base_path, path_org, path_cf):
     # Extract features.
     cf_features, average_cf_features = extract_features(cf_trajectories)
     average_cf_features.append(np.mean(cf_rewards))
-    explained_variance = calulate_PCA(cf_features)
+    # explained_variance = calulate_PCA(cf_features)
     cf_features = [f + [r] for f,r in zip(cf_features, cf_rewards)]
     
-    write(base_path + '\cf_features_norm3.csv', cf_features)
-    write(base_path + '\statistics' + '\cf_feature_stats.csv', average_cf_features)
+    write(cf_features, base_path + '\cf_features.pkl')
+    write(average_cf_features, base_path + '\statistics' + '\cf_feature_stats.csv')
 
 
 
@@ -124,7 +124,7 @@ def calulate_PCA(org_features):
     return explained_variance
 
 if __name__ == '__main__':
-    folder_path = 'datasets\\100_ablations_3'
+    folder_path = 'datasets\\1000\\1000'
 
     all_folder_base_paths = iterate_through_folder(folder_path)
     all_folder_base_paths.reverse()

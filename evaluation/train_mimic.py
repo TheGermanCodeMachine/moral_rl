@@ -13,6 +13,7 @@ import random
 from helpers.folder_util_functions import iterate_through_folder, save_results, read, write
 from copy import deepcopy
 from utils_evaluation import *
+from itertools import chain
 
 class hyperparameters:
     learning_rate = 1e-1
@@ -20,7 +21,7 @@ class hyperparameters:
     l1_lambda = 1e-1
     epochs_non_contrastive = 10000
     epochs_contrastive = 1000
-    number_of_seeds = 10
+    number_of_seeds = 30
     
     
 class config:    
@@ -98,7 +99,7 @@ def train_test_split_mixed(org_trajs, cf_trajs, num_features, train_ratio=0.8, d
     return train_con, train_labels_con, train_sin, train_labels_sin, test_con, test_labels_con, test_sin, test_labels_sin
 
 
-def train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin=torch.tensor([]), train_labels_sin=torch.tensor([]), test_set_sin=None, test_labels_sin=None, num_features=8, epochs = hyperparameters.epochs_contrastive, learning_rate=hyperparameters.learning_rate, regularisation = hyperparameters.regularisation, num_layers = None, hidden_layer_sizes = None, base_path=None, l2=None, stop_epoch = 0, data_mixture=(1,0)):
+def train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin=torch.tensor([]), train_labels_sin=torch.tensor([]), test_set_sin=None, test_labels_sin=None, num_features=8, epochs = hyperparameters.epochs_contrastive, learning_rate=hyperparameters.learning_rate, regularisation = hyperparameters.regularisation, num_layers = None, hidden_layer_sizes = None, base_path=None, l2=None, stop_epoch = 0, data_mixture=(1,0), task_weights=(1,3)):
 
     # Initialise the model (either NN or LM)
     if config.model_type=='NN':
@@ -106,94 +107,117 @@ def train_model(train_set, train_labels, test_set_con, test_labels_con, train_se
         layer_dims = [num_features] + hidden_layer_sizes + [1]
 
         # Initialise the neural network with the number of layers and the hidden_sizes
-        model = torch.nn.Sequential()
+        base_model = torch.nn.Sequential()
         if num_layers:
-            model.add_module('linear' + str(0), torch.nn.Linear(layer_dims[0], layer_dims[1]))
-            for i in range(1, num_layers-1):
-                model.add_module('relu' + str(i), torch.nn.ReLU())
-                model.add_module('linear' + str(i), torch.nn.Linear(layer_dims[i], layer_dims[i+1]))
+            base_model.add_module('linear' + str(0), torch.nn.Linear(layer_dims[0], layer_dims[1]))
+            for i in range(1, num_layers-2):
+                base_model.add_module('relu' + str(i-1), torch.nn.ReLU())
+                base_model.add_module('linear' + str(i), torch.nn.Linear(layer_dims[i], layer_dims[i+1]))
+            base_model.add_module('relu' + str(num_layers-3), torch.nn.ReLU())
+        model_sin = torch.nn.Linear(layer_dims[-2], layer_dims[-1])
+        model_con = torch.nn.Linear(layer_dims[-2], layer_dims[-1])
 
     elif config.model_type=='linear':
         model = torch.nn.Linear(num_features, 1)
 
-    loss_fn = torch.nn.MSELoss(reduction='sum')
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=regularisation)
+    loss_fn = torch.nn.MSELoss(reduction='mean')
+
+    optimizer_base = torch.optim.Adam(base_model.parameters(), lr=learning_rate, weight_decay=regularisation)
+    optimizer_sin = torch.optim.Adam(model_sin.parameters(), lr=learning_rate, weight_decay=regularisation)
+    optimizer_con = torch.optim.Adam(model_con.parameters(), lr=learning_rate, weight_decay=regularisation)
 
     train_losses, train_losses_sin, weighted_train_losses, test_losses_con, test_losses_sin, stop_train_losses, stop_train_losses_sin, stop_test_losses_con, stop_test_losses_sin = [], [], [], [], [], [], [], [], []
 
     for t in range(epochs):
         # if we want to stop the training at a certain epoch, save the model and the losses, but continue training until the end
         if t == stop_epoch-1:
-            stop_model = deepcopy(model)
+            stop_model_sin = torch.nn.Sequential(deepcopy(base_model), deepcopy(model_sin))
+            stop_model_con = torch.nn.Sequential(deepcopy(base_model), deepcopy(model_con))
+            # stop_base_model.add_module('linear' + str(num_layers-2))
             stop_train_losses = deepcopy(train_losses)
             stop_train_losses_sin = deepcopy(train_losses_sin)
             stop_test_losses_con = deepcopy(test_losses_con)
             stop_test_losses_sin = deepcopy(test_losses_sin)
 
         # Forward pass: compute predicted y by passing x to the model.
-        y_pred = model(train_set).squeeze()
-        y_pred_sin = model(train_set_sin).squeeze()
+        base_pred = base_model(train_set)
+        y_pred = model_con(base_pred).squeeze()
+        base_pred_sin = base_model(train_set_sin)
+        y_pred_sin = model_sin(base_pred_sin).squeeze()
         # Compute and print loss for the contrastive and the single trajectories
         loss = loss_fn(y_pred, train_labels)
         loss_sin = loss_fn(y_pred_sin, train_labels_sin)
-        loss_weighted = loss
-        loss_weighted_sin = loss_sin/40
-        train_losses.append(loss_weighted.item()*data_mixture[0])
-        train_losses_sin.append(loss_weighted_sin.item()*data_mixture[1])
+        if train_labels_sin.shape[0] == 0: loss_sin = torch.tensor(0.0)
+        if train_labels.shape[0] == 0: loss = torch.tensor(0.0)
 
-        weighted_loss = loss_weighted + loss_weighted_sin
+        train_losses.append(loss.item()/task_weights[0])
+        train_losses_sin.append(loss_sin.item()/task_weights[1])
+
+        weighted_loss = loss*data_mixture[0]/task_weights[0] + loss_sin*data_mixture[1]/task_weights[1]
         weighted_train_losses.append(weighted_loss.item())
         # Before the backward pass, use the optimizer object to zero all of the
         # gradients for the variables it will update (which are the learnable weights of the model)
-        optimizer.zero_grad()
+        optimizer_sin.zero_grad()
+        optimizer_con.zero_grad()
+        optimizer_base.zero_grad()
         # Backward pass: compute gradient of the loss with respect to model parameters
         weighted_loss.backward()
         # Calling the step function on an Optimizer makes an update to its parameters
-        optimizer.step()
+        optimizer_sin.step()
+        optimizer_con.step()
+        optimizer_base.step()
 
         # record the loss at this epoch for the test set
         with torch.no_grad():
-            model.eval()
-            y_pred_test = model(test_set_con).squeeze()
+            base_model.eval()
+            model_sin.eval()
+            model_con.eval()
+            base_pred = base_model(test_set_con)
+            y_pred_test = model_con(base_pred).squeeze()
+            base_pred_sin = base_model(test_set_sin)
+            y_pred_test_sin = model_sin(base_pred_sin).squeeze()
             loss = loss_fn(y_pred_test, test_labels_con)
+            loss_sin = loss_fn(y_pred_test_sin, test_labels_sin)
+            if test_labels_sin.shape[0] == 0: loss_sin = torch.tensor(0.0)
+            if test_labels_con.shape[0] == 0: loss = torch.tensor(0.0)
             test_losses_con.append(loss.item())
-
-            if test_set_sin != None:
-                y_pred_test = model(test_set_sin).squeeze()
-                loss = loss_fn(y_pred_test, test_labels_sin)
-                test_losses_sin.append(loss.item())
-            model.train()
+            test_losses_sin.append(loss_sin.item())
+            base_model.train()
+            model_sin.train()
+            model_con.train()
     
-    fig, ax = plt.subplots()
-    ax.plot(train_losses, label='train loss con')
-    ax.plot(train_losses_sin, label='train loss sin')
+    # fig, ax = plt.subplots()
+    # ax.plot(train_losses, label='train loss con')
+    # ax.plot(train_losses_sin, label='train loss sin')
     # ax.plot(test_losses_con, label='test loss con')
-    ax.plot(weighted_train_losses, label='weighted train loss')
+    # ax.plot(weighted_train_losses, label='weighted train loss')
     # ax.plot(test_losses_sin, label='test loss sin')
-    ax.set_xlabel('epoch')
-    plt.title('Losses' + str(data_mixture[0]) + ', ' + str(data_mixture[1]) + 'lr:' + str(learning_rate))
-    plt.legend()
-    plt.show()
+    # ax.set_xlabel('epoch')
+    # plt.title('Losses' + str(data_mixture[0]) + ', ' + str(data_mixture[1]) + 'lr:' + str(learning_rate))
+    # plt.legend()
+    # plt.show()
 
 
-    model.eval()
     if stop_epoch != 0:
-        stop_model.eval()
+        stop_model_sin.eval()
+        stop_model_con.eval()
         if test_set_sin != None:
-            return stop_model, train_losses, train_losses_sin, test_losses_con, test_losses_sin, stop_train_losses, stop_train_losses_sin, stop_test_losses_con, stop_test_losses_sin
+            return stop_model_con, stop_model_sin, train_losses, train_losses_sin, test_losses_con, test_losses_sin, stop_train_losses, stop_train_losses_sin, stop_test_losses_con, stop_test_losses_sin
         else:
-            return stop_model, train_losses, train_losses_sin, test_losses_con, stop_train_losses, stop_train_losses_sin, stop_test_losses_con
+            return stop_model_con, None, train_losses, train_losses_sin, test_losses_con, stop_train_losses, stop_train_losses_sin, stop_test_losses_con
+    model_sin_full = torch.nn.Sequential(base_model, model_sin)
+    model_con_full = torch.nn.Sequential(base_model, model_con)
     if test_set_sin != None:
-        return model, train_losses, train_losses_sin, test_losses_con, test_losses_sin, None, None, None
+        return model_con_full, model_sin_full, train_losses, train_losses_sin, test_losses_con, test_losses_sin, None, None, None
     else:
-        return model, train_losses, train_losses_sin, test_losses_con
+        return model_con_full, model_sin_full, train_losses, train_losses_sin, test_losses_con
 
-def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1,0)):
+def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1,0), task_weights=(1,3)):
     org_features = pickle.load(open(path_org, 'rb'))
     cf_features = pickle.load(open(path_cf, 'rb'))
     num_features = len(org_features[0])-1
 
-    results_path = base_path + config.results_path + str(data_mixture[0]) + ',' + str(data_mixture[1]) + "\\"
+    results_path = base_path + config.results_path + "(1,1)task_weights\\"+ str(task_weights[0]) + ',' + str(task_weights[1]) + "\\"
 
     num_layers, hidden_sizes = None, None
 
@@ -212,19 +236,19 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     test_set_ood_con, test_labels_ood_con, _ , _ = train_test_split_contrastive(org_features_ood, cf_features_ood, num_features, train_ratio=1)
     test_set_ood_sin, test_labels_ood_sin, _ , _ = train_test_split_single(org_features_ood, cf_features_ood, num_features, train_ratio=1)
 
-    train_set, train_labels, train_set_sin, train_labels_sin, test_set_con, test_labels_con, test_set_sin, test_labels_sin = train_test_split_mixed(org_features, cf_features, num_features, train_ratio=0.8, data_mixture=data_mixture)
-    epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture)
+    train_set, train_labels, train_set_sin, train_labels_sin, test_set_con, test_labels_con, test_set_sin, test_labels_sin = train_test_split_mixed(org_features, cf_features, num_features, train_ratio=1, data_mixture=data_mixture)
+    epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture, task_weights=task_weights)
 
     for repeat in range(hyperparameters.number_of_seeds):
         # train the model (works for both, the linear and NN model)
-        model, full_train_losses, full_train_losses_sin, full_test_losses_con, full_test_losses_sin, train_losses, train_losses_sin, test_losses_con, test_losses_sin = train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin, train_labels_sin, test_set_sin, test_labels_sin, num_features, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation, num_layers=num_layers, hidden_layer_sizes=hidden_sizes, data_mixture=data_mixture)
+        model_con, model_sin, full_train_losses, full_train_losses_sin, full_test_losses_con, full_test_losses_sin, train_losses, train_losses_sin, test_losses_con, test_losses_sin = train_model(train_set, train_labels, test_set_con, test_labels_con, train_set_sin, train_labels_sin, test_set_sin, test_labels_sin, num_features, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation, num_layers=num_layers, hidden_layer_sizes=hidden_sizes, data_mixture=data_mixture, task_weights=task_weights)
 
         # here we test on the left out test set
-        test_loss_con, test_mean_error_con, test_rmse_con, r2_con, pearson_correlation_con, spearman_correlation_con, pred_label_pairs_con = evaluate_mimic(model, test_set_con, test_labels_con, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
-        test_loss_sin, test_mean_error_sin, test_rmse_sin, r2_sin, pearson_correlation_sin, spearman_correlation_sin, pred_label_pairs_sin = evaluate_mimic(model, test_set_sin, test_labels_sin, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
+        test_loss_con, test_mean_error_con, test_rmse_con, r2_con, pearson_correlation_con, spearman_correlation_con, pred_label_pairs_con = evaluate_mimic(model_con, test_set_con, test_labels_con, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
+        test_loss_sin, test_mean_error_sin, test_rmse_sin, r2_sin, pearson_correlation_sin, spearman_correlation_sin, pred_label_pairs_sin = evaluate_mimic(model_sin, test_set_sin, test_labels_sin, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
         # here we test on a seperate test set from a different distribution
-        test_loss_ood_con, test_mean_error_ood_con, test_rmse_ood_con, r2_ood_con, pearson_correlation_ood_con, spearman_correlation_ood_con, pred_label_pairs_ood_con = evaluate_mimic(model, test_set_ood_con, test_labels_ood_con, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
-        test_loss_ood_sin, test_mean_error_ood_sin, test_rmse_ood_sin, r2_ood_sin, pearson_correlation_ood_sin, spearman_correlation_ood_sin, pred_label_pairs_ood_sin = evaluate_mimic(model, test_set_ood_sin, test_labels_ood_sin, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
+        test_loss_ood_con, test_mean_error_ood_con, test_rmse_ood_con, r2_ood_con, pearson_correlation_ood_con, spearman_correlation_ood_con, pred_label_pairs_ood_con = evaluate_mimic(model_con, test_set_ood_con, test_labels_ood_con, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
+        test_loss_ood_sin, test_mean_error_ood_sin, test_rmse_ood_sin, r2_ood_sin, pearson_correlation_ood_sin, spearman_correlation_ood_sin, pred_label_pairs_ood_sin = evaluate_mimic(model_sin, test_set_ood_sin, test_labels_ood_sin, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
 
         test_lossess_con.append(test_loss_con)
         test_lossess_sin.append(test_loss_sin)
@@ -238,14 +262,10 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
         pearson_correlations_sin.append(pearson_correlation_sin)
         spearman_correlations_con.append(spearman_correlation_con)
         spearman_correlations_sin.append(spearman_correlation_sin)
-        if config.model_type == 'linear':
-            weights.append(get_weights(model, config.print_weights))
         train_lossess.append(train_losses[-1])
         all_train_losses.append(full_train_losses)
         all_test_losses_con.append(full_test_losses_con)
         all_test_losses_sin.append(full_test_losses_sin)
-        train_mean_errors.append(torch.mean(torch.abs(model(train_set).squeeze() - train_labels)).item())
-        train_rmses.append(torch.sqrt(torch.mean((model(train_set).squeeze() - train_labels)**2)).item())
 
         test_loss_oods_con.append(test_loss_ood_con)
         test_loss_oods_sin.append(test_loss_ood_sin)
@@ -268,7 +288,8 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
             path = base_path + "\\results_normaliserewards3\\saved_models\\"
             if not os.path.exists(path):
                 os.makedirs(path)
-            torch.save(model.state_dict(), path + 'model' + str(repeat) + '.pt')
+            torch.save(model_sin.state_dict(), path + 'model_sin' + str(repeat) + '.pt')
+            torch.save(model_con.state_dict(), path + 'model_con' + str(repeat) + '.pt')
 
 
     # print('final train_loss', np.mean(train_losses))
@@ -278,13 +299,14 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     print('test r2', np.mean(test_r2s_con), np.mean(test_r2s_sin))
     print('pearson correlation', np.mean(pearson_correlations_con), np.mean(pearson_correlations_sin))
     print('spearman correlation', np.mean(spearman_correlations_con), np.mean(spearman_correlations_sin))
-    average_reward = torch.mean(train_labels)
-    print('average reward', average_reward)
-    average_prediction = torch.mean(model(train_set).squeeze())
-    print('average prediction', average_prediction)
-    if config.model_type == 'linear':
-        weights = np.mean(weights, axis=0)
-        print('weights', [v + ": " + str(weights[k]) for k,v in enumerate(config.features) if k < num_features])
+    average_reward_con = torch.mean(train_labels)
+    print('average reward contrastive', average_reward_con)
+    average_reward_sin = torch.mean(train_labels_sin)
+    print('average reward single', average_reward_sin)
+    average_prediction = torch.mean(model_con(train_set).squeeze())
+    print('average prediction contrastive', average_prediction)
+    average_prediction_sin = torch.mean(model_sin(train_set_sin).squeeze())
+    print('average prediction single', average_prediction_sin)
     all_train_losses = np.mean(all_train_losses, axis=0)
     all_test_losses_con = np.mean(all_test_losses_con, axis=0)
     all_test_losses_sin = np.mean(all_test_losses_sin, axis=0)
@@ -302,12 +324,12 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     if config.save_results:
         to_save = {'train_losses': train_lossess, 'test_losses': test_lossess_con, 'test_mean_errors': test_mean_errors_con, 
                    'train_mean_errors': train_mean_errors, 'train_rmses': train_rmses, 'test_rmses': test_rmses_con, 'pearson_correlations': pearson_correlations_con, 'spearman_correlations': spearman_correlations_con, 
-                   'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses_con, 'average_reward': average_reward, 'pred_label_pairs': pred_label_pairs_con, 'average_prediction': average_prediction, 'r2s': test_r2s_con}
+                   'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses_con, 'average_reward': average_reward_con, 'pred_label_pairs': pred_label_pairs_con, 'average_prediction': average_prediction, 'r2s': test_r2s_con}
         save_results(to_save, results_path, baseline, type='results', data_mixture=data_mixture, con=True)
 
         to_save = {'train_losses': train_lossess, 'test_losses': test_lossess_sin, 'test_mean_errors': test_mean_errors_sin, 
                    'train_mean_errors': train_mean_errors, 'train_rmses': train_rmses, 'test_rmses': test_rmses_sin, 'pearson_correlations': pearson_correlations_sin, 'spearman_correlations': spearman_correlations_sin, 
-                   'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses_sin, 'average_reward': average_reward, 'pred_label_pairs': pred_label_pairs_sin, 'average_prediction': average_prediction, 'r2s': test_r2s_sin}
+                   'weights': weights, 'all_train_losses': all_train_losses, 'all_test_losses': all_test_losses_sin, 'average_reward': average_reward_con, 'pred_label_pairs': pred_label_pairs_sin, 'average_prediction': average_prediction, 'r2s': test_r2s_sin}
         save_results(to_save, results_path, baseline, type='results', data_mixture=data_mixture, con=False)
 
         hyper_params = {'epochs': epochss, 'learning_rate': learning_rates, 'l2_regularisation': regularisations}
@@ -349,12 +371,13 @@ def cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, tra
         validation_labels_f_sin = train_labels_folds_sin[k]
     return train_set_f, train_labels_f, validation_set_f, validation_labels_f, torch.tensor(train_set_f_sin), train_labels_f_sin, torch.tensor(validation_set_f_sin), validation_labels_f_sin
 
-def hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture=(1,0)):
+def hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture=(1,0), task_weights=(1,3)):
     # we use 5-fold cross validation to find the best hyper parameters
     data_folds = config.data_folds
     train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin = split_for_cross_validation(train_set, train_labels, train_set_sin, train_labels_sin, k=data_folds)
 
-    num_features = len(train_set[0])
+    if len(train_set > 0): num_features = len(train_set[0])
+    else: num_features = len(train_set_sin[0])
     best_loss = 100000000
     best_epoch = 0
     best_lr = 0
@@ -368,8 +391,7 @@ def hyper_param_optimization(train_set, train_labels, train_set_sin, train_label
         # architectures = [(4, [[4,4]])]
     else:
         architectures = [(None, [None])]
-    # learning_rates = [0.001, 0.01, 0.1, 0.3]
-    learning_rates = [0.1, 0.3]
+    learning_rates = [0.001, 0.01, 0.1, 0.3]
     l2_lambdas = [0, 0.01, 0.1, 1]
 
     # loop over network architectures (not relevant for the LM)
@@ -378,14 +400,14 @@ def hyper_param_optimization(train_set, train_labels, train_set_sin, train_label
             best_loss_tmp = 10000000000000000
             # loop over hyper parameters
             for lrs in learning_rates:
-                print('learning rate', lrs)
+                # print('learning rate', lrs)
                 for l2 in l2_lambdas:
                     # iterate over the k folds for cross validation
                     test_lossess = []
                     for k in range(data_folds):
                         train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin = cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin, k)
-                        model, train_losses, train_losses_sin, test_losses, _ , _, _, _= train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin, num_features=num_features, epochs=hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size, data_mixture=data_mixture)
-                        test_lossess.append(test_losses)
+                        model_sin, model_con, train_losses, train_losses_sin, test_losses_con, test_losses_sin , _, _, _= train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin, num_features=num_features, epochs=hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size, data_mixture=data_mixture, task_weights=task_weights)
+                        test_lossess.append([test_losses_sin[i]*data_mixture[1]/42 + test_losses_con[i]*data_mixture[0] for i in range(len(test_losses_sin))])
 
                     # show_loss_plot(train_losses, test_losses, show=False, lr=lrs, l2=l2)
                     avg_test_losses = np.mean(test_lossess, axis=0)
@@ -438,19 +460,21 @@ def experiment_over_all_folders():
         print('\n')
 
 def experiment_for_single_folder():
-    folder_path = 'datasets\\100_ablations_3\\pvcd100'
+    folder_path = 'datasets\\1000\\1000'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:
         folder_path = sys.argv[1]
 
-    path_org_cte = folder_path + '\org_features_norm3.pkl'
-    path_cf_cte = folder_path + '\cf_features_norm3.pkl'
+    path_org_cte = folder_path + '\org_features.pkl'
+    path_cf_cte = folder_path + '\cf_features.pkl'
 
-    data_mixtures = [(0.5,1), (1,0.25), (1,0), (1,0.5), (1,0.75), (1,1), (0.75,1), (0.25,1), (0,1)]
+    # data_mixtures = [(1,0), (1,0.25), (1,0.5), (1,0.75), (1,1), (0.75,1), (0.5,1), (0.25,1), (0,1)]
+    data_mixtures = [(0.001, 0.001), (0.002, 0.002), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02), (0.05, 0.05), (0.1, 0.1), (0.2, 0.2), (0.5, 0.5), (0.8, 0.8)]
+    task_weight = (1,3)
     for data_mixture in data_mixtures:
-        print('# MIXTURE: ', data_mixture)
-        learning_repeats(path_org_cte, path_cf_cte, folder_path, baseline=0, data_mixture=data_mixture)
+        print(data_mixture)
+        learning_repeats(path_org_cte, path_cf_cte, folder_path, baseline=0, data_mixture=data_mixture, task_weights=task_weight)
 
 if __name__ == '__main__':
     experiment_for_single_folder()

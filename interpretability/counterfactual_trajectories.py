@@ -40,10 +40,11 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    base_path = '.\datasets\\100_ablations_3\\'
+    base_path = '.\datasets\\1000\\'
     measure_statistics = True
-    num_runs = 100
-    criteria = ['validity', 'diversity', 'proximity', 'critical_state']
+    num_runs = 1000
+    # criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
+    criteria = ['baseline']
     # criteria = ['validity']
     
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
@@ -120,7 +121,7 @@ def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
     for step in range(0, len(org_traj['actions'])-1):
         counterfactual_traj = {'states': [], 'actions': [], 'rewards': []}
         counterfactual_deviation = 0
-        
+
         # follow the steps of the original trajectory until the point of divergence (called step here)
         counterfactual_traj, states_tensor = retrace_original(0, step, counterfactual_traj, org_traj, vec_env_cf, states_tensor, discriminator)
 
@@ -228,7 +229,7 @@ if __name__ == '__main__':
     lengths_org, lengths_cf, start_points, quality_criteria, effiencies, qc_statistics = [], [], [], [], [], []
 
     # load the original trajectories
-    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl.pkl', 'rb'))
+    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_1000.pkl', 'rb'))
 
     # stop after the number of runs config.num_runs or iterate through all original trajectories
     run = 0
@@ -254,7 +255,7 @@ if __name__ == '__main__':
         efficiency = time.time() - time_start
 
         # uncomment below if the trajectories should be visualized:
-        visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[sort_index], end_cfs[sort_index],  end_orgs[sort_index])
+        # visualize_two_part_trajectories(org_traj, best_counterfactual_trajectory, starts[sort_index], end_cfs[sort_index],  end_orgs[sort_index])
 
         part_org = partial_trajectory(org_traj, starts[sort_index], end_orgs[sort_index])
         part_rewards = sum(part_org['rewards'])
