@@ -53,7 +53,7 @@ crit_div_spears = crit_div_spears[1:]
 qc_div_pears = qc_div_pears[1:]
 val_div_pears = val_div_pears[1:]
 prox_div_pears = prox_div_pears[1:]
-crit_div_pears = crit_div_pears[1:]
+crit_div_pears = crit_div_pears[1:] 
 
 print("qc-validity", np.mean(qc_val_spears), np.mean(qc_val_pears))
 print("qc-proximity", np.mean(qc_prox_spears), np.mean(qc_prox_pears))
