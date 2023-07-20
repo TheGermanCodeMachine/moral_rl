@@ -1,6 +1,5 @@
 datasets/
+demonstrations/
 saved_models/tmp/
 logs/
-demonstrations/
-# ignore __pycache__ files
 __pycache__/
