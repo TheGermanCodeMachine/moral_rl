@@ -55,8 +55,8 @@ def distance_subtrajectories(traj1, traj2):
 
     dist_A_B = np.mean(np.min(dist_table, axis=1))
     dist_B_A = np.mean(np.min(dist_table, axis=0))
-    deviation = 0.05*len((traj1['states'])) + 0.05*len((traj2['states']))
-    sum = max(dist_A_B, dist_B_A) + deviation
+    # deviation = 0.05*len((traj1['states'])) + 0.05*len((traj2['states']))
+    sum = max(dist_A_B, dist_B_A)
 
     # take log of sum
     return np.log(sum)

@@ -5,6 +5,7 @@ sys.path.append(str(adjacent_folder))
 
 import numpy as np
 import torch
+import random
 from helpers.util_functions import extract_player_position, normalise_values, partial_trajectory
 from quality_metrics.distance_measures import my_distance, distance_subtrajectories, state_action_diff
 
@@ -54,7 +55,11 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
 def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
     if len(prev_starts) == 0:
         return [0 for x in range(len(end_cfs))]
-    iterate_prev = range(len(prev_starts))
+    # pick 20 random values from a range
+    if len(prev_starts) > 10:
+        iterate_prev = random.sample(list(range(len(prev_starts))), 2)
+    else:
+        iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
     prev_org_trajs = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
     prev_cf_trajs = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
