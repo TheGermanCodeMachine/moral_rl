@@ -231,8 +231,8 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     path = base_path.split('\\')
     path = '\\'.join(path[:-1])
     # load the data
-    org_features_ood = read(path + '\\baseline1\org_features_norm3.pkl')
-    cf_features_ood = read(path + '\\baseline1\cf_features_norm3.pkl')
+    org_features_ood = read(path + '\\baseline\org_features.pkl')
+    cf_features_ood = read(path + '\\baseline\cf_features.pkl')
     test_set_ood_con, test_labels_ood_con, _ , _ = train_test_split_contrastive(org_features_ood, cf_features_ood, num_features, train_ratio=1)
     test_set_ood_sin, test_labels_ood_sin, _ , _ = train_test_split_single(org_features_ood, cf_features_ood, num_features, train_ratio=1)
 
@@ -285,7 +285,7 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
         print(test_mean_error_sin, test_mean_error_ood_sin)
 
         if config.save_model:
-            path = base_path + "\\results_normaliserewards3\\saved_models\\"
+            path = base_path + '\\'+str(data_mixture[0])+'_'+str(data_mixture[1])+"\\results\\saved_models\\"
             if not os.path.exists(path):
                 os.makedirs(path)
             torch.save(model_sin.state_dict(), path + 'model_sin' + str(repeat) + '.pt')
@@ -374,6 +374,7 @@ def cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, tra
 def hyper_param_optimization(train_set, train_labels, train_set_sin, train_labels_sin, data_mixture=(1,0), task_weights=(1,3)):
     # we use 5-fold cross validation to find the best hyper parameters
     data_folds = config.data_folds
+    if len(train_labels)<=10: data_folds = 2
     train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin = split_for_cross_validation(train_set, train_labels, train_set_sin, train_labels_sin, k=data_folds)
 
     if len(train_set > 0): num_features = len(train_set[0])
@@ -407,7 +408,7 @@ def hyper_param_optimization(train_set, train_labels, train_set_sin, train_label
                     for k in range(data_folds):
                         train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin = cross_validate(train_set_folds, train_labels_folds, train_set_folds_sin, train_labels_folds_sin, k)
                         model_sin, model_con, train_losses, train_losses_sin, test_losses_con, test_losses_sin , _, _, _= train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, train_set_f_sin, train_labels_f_sin, validation_set_f_sin, validation_labels_f_sin, num_features=num_features, epochs=hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size, data_mixture=data_mixture, task_weights=task_weights)
-                        test_lossess.append([test_losses_sin[i]*data_mixture[1]/42 + test_losses_con[i]*data_mixture[0] for i in range(len(test_losses_sin))])
+                        test_lossess.append([test_losses_sin[i]*data_mixture[1]/task_weights[1] + test_losses_con[i]*data_mixture[0]/task_weights[0] for i in range(len(test_losses_sin))])
 
                     # show_loss_plot(train_losses, test_losses, show=False, lr=lrs, l2=l2)
                     avg_test_losses = np.mean(test_lossess, axis=0)
@@ -470,7 +471,7 @@ def experiment_for_single_folder():
     path_cf_cte = folder_path + '\cf_features.pkl'
 
     # data_mixtures = [(1,0), (1,0.25), (1,0.5), (1,0.75), (1,1), (0.75,1), (0.5,1), (0.25,1), (0,1)]
-    data_mixtures = [(0.001, 0.001), (0.002, 0.002), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02), (0.05, 0.05), (0.1, 0.1), (0.2, 0.2), (0.5, 0.5), (0.8, 0.8)]
+    data_mixtures = [(0.002, 0.002), (0.005, 0.005), (0.01, 0.01), (0.02, 0.02), (0.05, 0.05), (0.1, 0.1), (0.2, 0.2), (0.5, 0.5), (0.8, 0.8)]
     task_weight = (1,3)
     for data_mixture in data_mixtures:
         print(data_mixture)

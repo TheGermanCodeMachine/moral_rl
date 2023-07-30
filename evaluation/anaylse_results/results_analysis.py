@@ -126,6 +126,7 @@ results, results_ood, weights, statistics, feature_states = [], [], [], [], []
 
 # iterate through all the folders
 for folder in os.listdir(base_path):
+    folder = 'pvcd100'
     if folder == 'description.txt' or folder == "baseline1":
         continue   
     # go into the results folder

@@ -14,3 +14,9 @@ def realisticness_all(org_traj, cfs, starts, end_cfs, end_orgs):
         diff = (avg_reward - avg_org_reward)/avg_org_reward
         real.append(diff)
     return real
+
+def realisticness_single_partial(org_traj, cf_traj):
+    avg_org_reward = sum(org_traj['rewards'])/len(org_traj['rewards'])
+    avg_reward = sum(cf_traj['rewards'])/len(cf_traj['rewards'])
+    diff = (avg_reward - avg_org_reward)/avg_org_reward
+    return diff

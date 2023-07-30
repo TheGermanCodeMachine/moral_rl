@@ -79,8 +79,10 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
     # length_divs = normalise_values(length_divs)
     # start_time_divs = normalise_values(start_time_divs)
     # start_state_divs = normalise_values(start_state_divs)
-    log_length_divs = [np.log(i) if i != 0 else 0 for i in length_divs]
-    log_start_time_divs = [np.log(i) if i != 0 else 0 for i in start_time_divs]
+    # log_length_divs = [np.log(i) if i != 0 else 0 for i in length_divs]
+    # log_start_time_divs = [np.log(i) if i != 0 else 0 for i in start_time_divs]
+    log_length_divs = length_divs
+    log_start_time_divs = start_time_divs
 
     sum = [log_length_divs[i] + log_start_time_divs[i] + up_down_divs[i] for i in range(len(length_divs))]
     return sum

@@ -69,6 +69,13 @@ class PPO(nn.Module):
 
         return action_log_probabilities, torch.squeeze(critic_values), action_entropy
 
+    def action_probabilities(self, state):
+        action_probabilities, _ = self.forward(state)
+        m = Categorical(action_probabilities)
+        return m.probs.detach().cpu().numpy()[0]
+    
+    def action_distribution_torch(self, state):
+        return self.forward(state)[0]
 
 class TrajectoryDataset:
     def __init__(self, batch_size, n_workers):

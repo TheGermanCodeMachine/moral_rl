@@ -58,16 +58,16 @@ def distance_subtrajectories(traj1, traj2):
     # deviation = 0.05*len((traj1['states'])) + 0.05*len((traj2['states']))
     sum = max(dist_A_B, dist_B_A)
 
-    # take log of sum
-    return np.log(sum)
+    return sum
 
 # this method calculates how different two state-action pairs in the randomized_v2 environment are
 # WARNING: this method works sensibly only for the randomized_v2 environment; other enivronments will need a different implementation
+# WARNING 2: The difference in numbers of citizens only works if the trajectories are from the same initialisation of the environment. Otherwise, edit distance should be used
 def state_action_diff(s1, a1, s2, a2):
     dist = 0
     # add 1 if the action is different
     if a1 != a2: dist += 0.5
-    # add the edit distance between the two matrices of unsaved citizens
+    # difference in number of citizens (warning: if the states are from different initialisations, this should arguably be edit distance)
     dist += np.sum(np.abs(s1[0][2] - s2[0][2]).detach().numpy())
 
     # manhattan distance between the player positions

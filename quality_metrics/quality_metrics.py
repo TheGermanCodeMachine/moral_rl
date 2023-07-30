@@ -7,15 +7,17 @@ import numpy as np
 import time
 from helpers.util_functions import *
 from quality_metrics.validity_measures import validity_all as validity
-from quality_metrics.validity_measures import validity_single
+from quality_metrics.validity_measures import validity_single, validity_single_partial
 from quality_metrics.distance_measures import distance_all as distance
 from quality_metrics.distance_measures import distance_single
 from quality_metrics.diversity_measures import diversity_all as diversity
-from quality_metrics.diversity_measures import diversity_single
+from quality_metrics.diversity_measures import diversity_single, distance_subtrajectories
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
 from quality_metrics.critical_state_measures import critical_state_single
 from quality_metrics.realisticness_measures import realisticness_all as realisticness
+from quality_metrics.realisticness_measures import realisticness_single_partial
 from quality_metrics.sparsity_measure import sparsity_all as sparsity
+from quality_metrics.sparsity_measure import sparsitiy_single_partial
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
@@ -30,8 +32,6 @@ def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, end_org, end_cf, 
 
 def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, criteria_to_use):
 
-    validity_qc, proximity_qc, critical_state_qc, diversity_qc = None, None, None, None
-
     # fig, ax = plt.subplots()
     # xx = range(len(starts))
     qc_values = [(x, 0) for x in range(len(counterfactual_rewards))]
@@ -45,6 +45,8 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
         qc_values = [(x, qc_values[x][1] + validity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'proximity' in criteria_to_use:
         proximity_qc = distance(org_traj, counterfactual_trajs, starts, end_cfs,end_orgs)
+        # take the log to make the distibution more concave
+        proximity_qc = np.log(proximity_qc)
         proximity_qc = normalise_values_01(proximity_qc)
         # ax.plot(xx, [-i for i in proximity_qc], 'go', label='proximity')
         proximity_qc = [val * weight['proximity'] for val in proximity_qc]
@@ -167,7 +169,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     critical_state_qc.sort(key=lambda x: x[1], reverse=True)
     diversity_qc = [(i,2*j) for i,j in enumerate(diversity_qc)]
     diversity_qc.sort(key=lambda x: x[1], reverse=True)
-    realisticness_qc = [(i,2*j) for i,j in enumerate(realisticness_qc)]
+    realisticness_qc = [(i,5*j) for i,j in enumerate(realisticness_qc)]
     realisticness_qc.sort(key=lambda x: x[1], reverse=True)
     sparsity_qc = [(i,2*j) for i,j in enumerate(sparsity_qc)]
     sparsity_qc.sort(key=lambda x: x[1], reverse=True)
@@ -181,16 +183,16 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     pos_spar = np.where(np.array([i[0] for i in sparsity_qc])==best_index)[0][0]
     print('POSITIONS: validity:', pos_val / len(validity_qc), 'proximity:', pos_prox /len(proximity_qc), 'critical_state:', pos_crit/len(critical_state_qc), 'diversity:', pos_div/len(diversity_qc), 'realisticness', pos_real/len(realisticness_qc), 'sparsity', pos_spar/len(sparsity_qc))
 
-    # fix, ax = plt.subplots()
-    # ax.plot(range(len(validity_qc)), [i[1] for i in validity_qc], 'ro', label='validity')
-    # ax.plot(range(len(proximity_qc)), [i[1] for i in proximity_qc], 'go', label='proximity')
-    # ax.plot(range(len(critical_state_qc)), [i[1] for i in critical_state_qc], 'bo', label='critical_state')
-    # ax.plot(range(len(diversity_qc)), [i[1] for i in diversity_qc], 'co', label='diversity')
-    # ax.plot(range(len(realisticness_qc)), [i[1] for i in realisticness_qc], 'mo', label='realisticness')
-    # ax.plot(range(len(sparsity_qc)), [i[1] for i in sparsity_qc], 'ko', label='sparsity')
-    # ax.plot(range(len(qc_values)), [i[1] for i in qc_values], 'yo', label='qc')
-    # plt.legend()
-    # plt.show()
+    fix, ax = plt.subplots()
+    ax.plot(range(len(validity_qc)), [i[1] for i in validity_qc], 'r-', label='validity')
+    ax.plot(range(len(proximity_qc)), [i[1] for i in proximity_qc], 'g-', label='proximity')
+    ax.plot(range(len(critical_state_qc)), [i[1] for i in critical_state_qc], 'b-', label='critical_state')
+    ax.plot(range(len(diversity_qc)), [i[1] for i in diversity_qc], 'c-', label='diversity')
+    ax.plot(range(len(realisticness_qc)), [i[1] for i in realisticness_qc], 'm-', label='realisticness')
+    ax.plot(range(len(sparsity_qc)), [i[1] for i in sparsity_qc], 'k-', label='sparsity')
+    ax.plot(range(len(qc_values)), [i[1] for i in qc_values], 'y-', label='qc')
+    plt.legend()
+    plt.show()
 
     spear_correlations = {'qc-validity': qc_val_spear, 'qc-proximity': qc_prox_spear, 'qc-critical_state': qc_crit_spear, 'qc-diversity': qc_div_spear, 'qc-realisticness': qc_real_spear, 'qc-sparsity': qc_spar_spear, 'validity-proximity': val_prox_spear, 'validity-critical_state': val_crit_spear, 'validity-diversity': val_div_spear, 'proximity-critical_state': prox_crit_spear, 'proximity-diversity': prox_div_spear, 'critical_state-diversity': crit_div_spear}
     pear_correlations = {'qc-validity': qc_val_pear, 'qc-proximity': qc_prox_pear, 'qc-critical_state': qc_crit_pear, 'qc-diversity': qc_div_pear, 'qc-realisticness': qc_real_pear, 'qc-sparsity': qc_spar_pear, 'validity-proximity': val_prox_pear, 'validity-critical_state': val_crit_pear, 'validity-diversity': val_div_pear, 'proximity-critical_state': prox_crit_pear, 'proximity-diversity': prox_div_pear, 'critical_state-diversity': crit_div_pear}
@@ -200,3 +202,26 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
 
     max_index = qc_values[0][0]
     return max_index, statistics
+
+# this function gives the evaluation for trajectories created with the mcts method.
+# It does not take into account critical state and diversity
+# It gives rewards for only 1 trajectory at a time, thus normalising is done beforehand by sampling random trajectories and evaluating the qc metrics on them
+def evaluate_qc(org_traj, cf_traj, criteria_to_use, normalisation):
+    qc_value = 0
+    if 'proximity' in criteria_to_use:
+        proximity_qc = distance_subtrajectories(org_traj, cf_traj)
+        proximity_qc = proximity_qc * normalisation['proximity'] * weight['validity']
+        qc_value += proximity_qc
+    if 'validity' in criteria_to_use:
+        validity_qc = validity_single_partial(org_traj, cf_traj)
+        validity_qc = validity_qc * normalisation['validity'] * weight['proximity']
+        qc_value += validity_qc
+    if 'sparsity' in criteria_to_use:
+        sparsity_qc = sparsitiy_single_partial(org_traj, cf_traj)
+        sparsity_qc = sparsity_qc * normalisation['sparsity'] * weight['sparsity']
+        qc_value += sparsity_qc
+    if 'realisticness' in criteria_to_use:
+        realisticness_qc = realisticness_single_partial(org_traj, cf_traj)
+        realisticness_qc = realisticness_qc * normalisation['realisticness'] * weight['realisticness']
+        qc_value += realisticness_qc
+    return qc_value

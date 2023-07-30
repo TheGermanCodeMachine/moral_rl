@@ -124,13 +124,13 @@ def calulate_PCA(org_features):
     return explained_variance
 
 if __name__ == '__main__':
-    folder_path = 'datasets\\1000\\1000'
+    folder_path = 'datasets\\1000'
 
     all_folder_base_paths = iterate_through_folder(folder_path)
     all_folder_base_paths.reverse()
 
     for base_path in all_folder_base_paths:
-
+        print(base_path)
         path_org = base_path + '\org_trajectories.pkl'
         path_cf = base_path + '\cf_trajectories.pkl'
         path_full = base_path + '\\full_trajectories.pkl'

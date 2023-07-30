@@ -125,4 +125,4 @@ def analyse_task_weights():
 
     print(tabulate(table))
 
-analyse_task_weights()
+analyse_data_mixtures()
