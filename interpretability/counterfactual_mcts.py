@@ -151,9 +151,7 @@ class MDP():
         
     def get_reward(self):
         org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(self.update_cf_traj)-1+self.starting_step)
-        org_traj = {'states': org_traj['states'][1:], 'actions': org_traj['actions'][:-1], 'rewards': org_traj['rewards'][1:]}
-        cf_traj = {'states': self.full_cf_traj['states'][1:], 'actions': self.full_cf_traj['actions'], 'rewards': self.full_cf_traj['rewards'][1:]}
-        return evaluate_qc(org_traj, cf_traj, qc_criteria_to_use, normalisation)
+        return evaluate_qc(org_traj, self.full_cf_traj, qc_criteria_to_use, normalisation)
     
 
     def get_actions(self, state):

@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import random
 from helpers.util_functions import extract_player_position, normalise_values, partial_trajectory
-from quality_metrics.distance_measures import my_distance, distance_subtrajectories, state_action_diff
+from quality_metrics.distance_measures import distance_subtrajectories, state_action_diff
 
 # global variable to store the rotated trajectories (so they don't have to be recalculated every time)
 ROTATED_TRAJ = None
@@ -18,23 +18,20 @@ ROTATED_TRAJ = None
 # - start and end of the part of the trajectory that make the CTE
 # - other quality metrics assigned to the CTE?
 # all trajectories have the form {'states': [s1, s2, s3, ...], 'actions': [a1, a2, a3, ...], 'rewards': [r1, r2, r3, ...]}
-def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs):
+def diversity(traj1, traj2, start, prev_org_traj, prev_cf_traj, prev_starts, all_rotated_trajs):
     iterate_prev = range(len(prev_starts))
 
     # calculate the diversity of the length of the trajectories and start and end times
-    length_div = length_diversity(end_cf - start, [prev_ends_cf[x] - prev_starts[x] for x in iterate_prev])
+    length_div = length_diversity(len(traj2['states']), [len(prev_cf_traj[x]) for x in iterate_prev])
     start_time_div = timestep_diversity(start, prev_starts)
     # end_time_div = timestep_diversity(end_cf, prev_ends_cf)
     
     # calculate the diversity of start and end states
-
     all_prev_first_states = [i['states'][0] for i in all_rotated_trajs]
     all_prev_first_actions = [i['actions'][0] for i in all_rotated_trajs]
-    start_state_div = state_diversity(traj1["states"][start], traj1["actions"][start], all_prev_first_states, all_prev_first_actions)
+    start_state_div = state_diversity(traj1["states"][0], traj1["actions"][0], all_prev_first_states, all_prev_first_actions)
 
-    org_traj = partial_trajectory(traj1, start, end_org)
-    cf_traj = partial_trajectory(traj2, start, end_cf)
-    up_down_div = up_down_diversity(org_traj, cf_traj, prev_org_traj, prev_cf_traj)
+    up_down_div = up_down_diversity(traj1, traj2, prev_org_traj, prev_cf_traj)
     # prev_last_states = [i['states'][-1] for i in prev_org_traj]
     # prev_last_actions = [i['actions'][-1] for i in prev_org_traj]
     # end_state_div = state_diversity(traj1['states'][end_org], traj1['actions'][end_org], prev_last_states, prev_last_actions)
@@ -52,7 +49,7 @@ def diversity(traj1, traj2, start, end_cf, end_org, prev_org_traj, prev_cf_traj,
     # print("length_div: ", length_div, "start_time_div: ", start_time_div, "start_state_div: ", start_state_div)
     return length_div, start_time_div, up_down_div # + trajectory_div_org + trajectory_div_cf
 
-def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
+def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs, prev_cf_trajs, prev_starts):
     if len(prev_starts) == 0:
         return [0 for x in range(len(end_cfs))]
     # pick 20 random values from a range
@@ -60,9 +57,6 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
         iterate_prev = random.sample(list(range(len(prev_starts))), 2)
     else:
         iterate_prev = range(len(prev_starts))
-    # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_trajs = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
-    prev_cf_trajs = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
 
     # make a list of all the previous original and counterfactual trajectories and their rotations
     all_prev_trajs = prev_org_trajs.copy()
@@ -72,7 +66,9 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
     start_time_divs = []
     up_down_divs = []
     for x in range(len(end_cfs)):
-        length_div, start_time_div, up_down_div = diversity(org_traj, cf_trajs[x], starts[x], end_cfs[x], end_orgs[x], prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
+        part_org_traj = partial_trajectory(org_traj, starts[x], end_orgs[x])
+        part_cf_traj = partial_trajectory(cf_trajs[x], starts[x], end_cfs[x])
+        length_div, start_time_div, up_down_div = diversity(part_org_traj, part_cf_traj, starts[x], prev_org_trajs, prev_cf_trajs, prev_starts, all_rotated_trajs)
         length_divs.append(length_div)
         start_time_divs.append(start_time_div)
         up_down_divs.append(up_down_div)
@@ -87,20 +83,20 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
     sum = [log_length_divs[i] + log_start_time_divs[i] + up_down_divs[i] for i in range(len(length_divs))]
     return sum
 
-def diversity_single(org_traj, cf_traj, start, end_cf, end_org, prev_org_trajs, prev_cf_trajs, prev_starts, prev_ends_cf, prev_ends_org):
+def diversity_single(org_traj, cf_traj, start, prev_org_trajs, prev_cf_trajs, prev_starts):
     # BUG: This is not normalised in the same way as the diversity_all function. THus it leads to different results.
     # TODO: Fix this
     if len(prev_starts) == 0:
         return 0
     iterate_prev = range(len(prev_starts))
     # take only the part of the previous trajectories between the start and end of the CTE
-    prev_org_traj = [partial_trajectory(prev_org_trajs[x], prev_starts[x], prev_ends_org[x]) for x in iterate_prev]
-    prev_cf_traj = [partial_trajectory(prev_cf_trajs[x], prev_starts[x], prev_ends_cf[x]) for x in iterate_prev]
+    prev_org_traj = [prev_org_trajs[x] for x in iterate_prev]
+    prev_cf_traj = [prev_cf_trajs[x] for x in iterate_prev]
     all_prev_traj = prev_org_traj.copy()
     all_prev_traj.extend(prev_cf_traj)
     all_rotated_trajs = [t for x in all_prev_traj for t in rotated_trajectories(x)]
     
-    length_div, start_time_div, start_state_div = diversity(org_traj, cf_traj, start, end_cf, end_org, prev_org_traj, prev_cf_traj, prev_starts, prev_ends_cf, prev_ends_org, all_rotated_trajs)
+    length_div, start_time_div, start_state_div = diversity(org_traj, cf_traj, start, prev_org_traj, prev_cf_traj, prev_starts, all_rotated_trajs)
     return length_div + start_time_div + start_state_div
     
     

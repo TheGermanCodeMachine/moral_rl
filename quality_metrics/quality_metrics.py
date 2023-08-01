@@ -23,14 +23,16 @@ from scipy.stats import pearsonr, spearmanr
 
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
 
-def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, end_org, end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs):
-    best_val = validity_single(org_traj, counterfactual_traj, start, end_cf, end_org)
-    best_prox = distance_single(org_traj, counterfactual_traj, start, end_cf, end_org)
-    best_crit = critical_state_single(ppo, org_traj['states'][start])
-    best_div = diversity_single(org_traj, counterfactual_traj, start, end_cf, end_org, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
-    return best_val, best_prox, best_crit, best_div
+def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_trajs, all_cf_trajs, all_starts):
+    best_val = validity_single_partial(org_traj, counterfactual_traj)
+    best_prox = distance_subtrajectories(org_traj, counterfactual_traj)
+    best_crit = critical_state_single(ppo, org_traj['states'][0])
+    best_div = diversity_single(org_traj, counterfactual_traj, start, all_org_trajs, all_cf_trajs, all_starts)
+    best_real = realisticness_single_partial(org_traj, counterfactual_traj)
+    best_spar = sparsitiy_single_partial(org_traj, counterfactual_traj)
+    return best_val, best_prox, best_crit, best_div, best_real, best_spar
 
-def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, criteria_to_use):
+def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, criteria_to_use):
 
     # fig, ax = plt.subplots()
     # xx = range(len(starts))
@@ -59,7 +61,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
         qc_values = [(x, qc_values[x][1] + critical_state_qc[x]) for x in range(len(counterfactual_rewards))]
     # IN THIS VERSION OF DIVERSITY WE COMPUTE DIVERSITY FOR ALL COUNTERFACTUALS, WHICH TAKES MORE TIME
     if 'diversity' in criteria_to_use:
-        diversity_qc = diversity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
+        diversity_qc = diversity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs, all_org_trajs, all_cf_trajs, all_starts)
         diversity_qc = normalise_values_01(diversity_qc)
         # ax.plot(xx, diversity_qc, 'yo', label='diversity')
         diversity_qc = [val * weight['diversity'] for val in diversity_qc]

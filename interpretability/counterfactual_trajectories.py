@@ -117,7 +117,7 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env):
     # get the index of the 5 states with the highest critical state
     critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
     critical_states.sort(key=lambda x: x[0], reverse=True)
-    critical_states = critical_states[:5]
+    critical_states = critical_states[:1]
 
     part_orgs, part_cfs, q_values = [], [], []
     for (i, starting_position) in critical_states:
@@ -285,7 +285,7 @@ if __name__ == '__main__':
             counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
             if not baseline:
                 # use the quality criteria to determine the best counterfactual trajectory
-                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs, config.criteria)
+                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, config.criteria)
                 qc_statistics.append(qc_stats)
             else:
                 # use a random baseline to determine the best counterfactual trajectory
@@ -316,16 +316,14 @@ if __name__ == '__main__':
             lengths_org.append(len(part_org['states']))
             lengths_cf.append(len(part_cf['states']))
             start_points.append(chosen_start)
-            chosen_val, chosen_prox, chosen_crit, chosen_dive = evaluate_qcs_for_cte(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_org, chosen_end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
-            quality_criteria.append((chosen_val, chosen_prox, chosen_crit, chosen_dive))
+            chosen_val, chosen_prox, chosen_crit, chosen_dive, chosen_real, chosen_spar = evaluate_qcs_for_cte(part_org, part_cf, chosen_start, ppo, all_org_trajs, all_cf_trajs, all_starts)
+            quality_criteria.append((chosen_val, chosen_prox, chosen_crit, chosen_dive, chosen_real, chosen_spar))
             effiencies.append(efficiency)
 
         # add the original trajectory and the counterfactual trajectory to the list of all trajectories
-        all_org_trajs.append(org_traj)
-        all_cf_trajs.append(chosen_counterfactual_trajectory)
+        all_org_trajs.append(part_org)
+        all_cf_trajs.append(part_cf)
         all_starts.append(chosen_start)
-        all_end_orgs.append(chosen_end_org)
-        all_end_cfs.append(chosen_end_cf)
 
 
     print('avg length org: ', np.mean(lengths_org))

@@ -16,43 +16,31 @@ from helpers.visualize_trajectory import visualize_two_part_trajectories
 def deviation_count(traj1, traj2, start_part, end_part_cf, end_part_org):
     return len(end_part_cf - start_part)
 
-def my_distance(traj1, traj2, start_part, end_part_cf, end_part_org):
-    """
-    My distance is a measure of the distance between two trajectories
-    :param traj1: trajectory 1
-    :param traj2: trajectory 2
-    :param start_part: where the two trajectories start deviating
-    :param end_part_cf: where the deviation of the counterfactual trajectory ends
-    :param end_part_org: timestep in the original trajectory where the counterfactual rejoins
-    :return: distance
-    """
-        
-    # select subtrajectory between start_part and end_part_cf
-    traj1_sub = partial_trajectory(traj1, start_part, end_part_org)
-    traj2_sub = partial_trajectory(traj2, start_part, end_part_cf)
-    return distance_subtrajectories(traj1_sub, traj2_sub)
-
 def distance_all(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs):
     dist = []
     for i in range(len(counterfactual_trajs)):
-        distance = my_distance(org_traj, counterfactual_trajs[i], starts[i], end_cfs[i], end_orgs[i])
+        traj1_sub = partial_trajectory(org_traj, starts[i], end_orgs[i])
+        traj2_sub = partial_trajectory(counterfactual_trajs[i], starts[i], end_cfs[i])
+        distance = distance_subtrajectories(traj1_sub, traj2_sub)
         
         dist.append(distance)
         # visualize_two_part_trajectories(org_traj, counterfactual_trajs[i], starts[i], end_cfs[i], end_orgs[i])
     return dist
 
 def distance_single(org_traj, counterfactual_traj, start, end_cf, end_org):
-    return my_distance(org_traj, counterfactual_traj, start, end_cf, end_org)
+    traj1_sub = partial_trajectory(org_traj, start, end_org)
+    traj2_sub = partial_trajectory(counterfactual_traj, start, end_cf)
+    return distance_subtrajectories(traj1_sub, traj2_sub)
 
 # Modified Hausdorff distance between two trajectories (see: Dubuisson, M. P., & Jain, A. K. (1994, October). A modified Hausdorff distance for object matching. In Proceedings of 12th international conference on pattern recognition (Vol. 1, pp. 566-568). IEEE.)
 def distance_subtrajectories(traj1, traj2):
     # calucalte the distance between every state-action pair in traj1 and traj2
-    dist_table = np.zeros((len(traj1['states']), len(traj2['states'])))
+    dist_table = np.zeros((len(traj1['states'])-1, len(traj2['states'])-1))
     act_diffs, cit_divs, pos_divs = np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states'])))
 
-    for i in range(len(traj1['states'])):
-        for j in range(len(traj2['states'])):
-            dist_table[i,j] = state_action_diff(traj1['states'][i], traj1['actions'][i], traj2['states'][j], traj2['actions'][j])
+    for i in range(len(traj1['states'])-1):
+        for j in range(len(traj2['states'])-1):
+            dist_table[i,j] = state_action_diff(traj1['states'][i+1], traj1['actions'][i], traj2['states'][j+1], traj2['actions'][j])
 
     dist_A_B = np.mean(np.min(dist_table, axis=1))
     dist_B_A = np.mean(np.min(dist_table, axis=0))
