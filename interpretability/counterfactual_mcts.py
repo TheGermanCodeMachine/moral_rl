@@ -33,8 +33,8 @@ from helpers.util_functions import partial_trajectory
 
 # 0-8 are the normal actions. 9 is an action which goes to the terminal state
 set_of_actions = [0,1,2,3,4,5,6,7,8]
-action_threshold = 0.0001
-likelihood_terminal = 0.1
+action_threshold = 0.05
+likelihood_terminal = 0.2
 discout_factor = 0.8
 terminal_state = (-1,-1)
 qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness']
@@ -47,27 +47,50 @@ def run_mcts_from(vec_env_cf, org_traj, starting_position, ppo, discriminator, s
     root_node = None
     qfunction = QTable()
 
+    i = 0
     while chosen_action!=9 and not done:
         mdp = MDP(vec_env_cf, org_traj, starting_position, ppo, discriminator, seed_env, cf_trajectory)
         root_node = SingleAgentMCTS(mdp, qfunction, UpperConfidenceBounds(), ppo).mcts(timeout=5, root_node=root_node)
 
         # choose the child node with the highest q value
-        val = -np.inf
+        max_val = -np.inf
+        string = ""
         for action in root_node.children:
+            string += str(action) + ": " + str(qfunction.get_q_value(root_node.trajectory, action)) + "; "
             value = qfunction.get_q_value(root_node.trajectory, action)
-            if value > val:
-                val = value
+            if value > max_val:
+                max_val = value
                 chosen_action = action
 
+        print("Depth:", i, "; Chosen action:", chosen_action, string)
         cf_trajectory.append(chosen_action)
         for (child, _) in root_node.children[chosen_action]:
             if cf_trajectory == child.trajectory:
                 root_node = child
-        
-
+        i +=1
         # action = qfunction.get_max_q(root_Node.trajectory, mdp.get_actions(root_Node.state))[0]
         # cf_trajectory.append(action)
         # (next_state, reward, done) = mdp.execute(action)
+
+    cf_trajectory.remove(9)
+
+    full_trajectory = {'states': [], 'actions': [], 'rewards': []}
+    vec_env = VecEnv(config.env_id, config.n_workers, seed=seed_env)
+    states = vec_env.reset()
+    states_tensor = torch.tensor(states).float().to(device)
+    full_trajectory, states_tensor = retrace_original(0, starting_position, full_trajectory, org_traj, vec_env, states_tensor, discriminator)
+    cf_traj = {'states': [states_tensor], 'actions': [], 'rewards': [discriminator.g(states_tensor)[0][0].item()]}
+    for action in cf_trajectory:
+        cf_traj['actions'].append(action)
+        state, reward, done, info = vec_env.step([action])
+        states_tensor = torch.tensor(state).float().to(device)
+        cf_traj['states'].append(states_tensor)
+        cf_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
+    org_traj = partial_trajectory(org_traj, starting_position, len(cf_traj['states'])-1+starting_position)
+    org_traj['actions'] = org_traj['actions'][:-1]
+    
+    return org_traj, cf_traj, max_val
+
 
         
 
@@ -107,8 +130,6 @@ class MDP():
         next_state, done = self.apply_action_to_env(self.env, action)
         if done:
             reward = self.get_reward()
-            # TODO: Not sure if this reset is necessary here
-            self.reset_env()
         else:
             reward = 0
         return next_state, reward, done
@@ -130,21 +151,25 @@ class MDP():
         
     def get_reward(self):
         org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(self.update_cf_traj)-1+self.starting_step)
-        org_traj['actions'][-1] = 9
-        self.full_cf_traj['actions'].append(9)
-        return evaluate_qc(self.original_trajectory, self.full_cf_traj, qc_criteria_to_use, normalisation)
+        org_traj = {'states': org_traj['states'][1:], 'actions': org_traj['actions'][:-1], 'rewards': org_traj['rewards'][1:]}
+        cf_traj = {'states': self.full_cf_traj['states'][1:], 'actions': self.full_cf_traj['actions'], 'rewards': self.full_cf_traj['rewards'][1:]}
+        return evaluate_qc(org_traj, cf_traj, qc_criteria_to_use, normalisation)
     
 
     def get_actions(self, state):
         valid_actions = []
         actions = self.ppo.action_probabilities(state)
+        act_tresh = action_threshold
         # the first action of the coutnerfactual trajectory should not be the same as the first action of the original trajectory 
         if len(self.update_cf_traj) == 0:
             org_action = self.original_trajectory['actions'][self.starting_step]
             actions[org_action] = 0
-        for action in set_of_actions:
-            if actions[action] > action_threshold:
-                valid_actions.append(action)
+        while len(valid_actions) < 3:
+            valid_actions = []
+            for action in set_of_actions:
+                if actions[action] > act_tresh:
+                    valid_actions.append(action)
+            act_tresh = act_tresh * 0.1
         # the first action cannot be 9, since this would immediately end the counterfactual without making a difference
         if len(self.update_cf_traj) > 0:
             valid_actions.append(9)
@@ -165,6 +190,7 @@ class MDP():
         tmp_traj, states_tensor = retrace_original(0, self.starting_step, tmp_traj, self.original_trajectory, env, states_tensor, self.discriminator)
         self.env = env
         self.full_cf_traj = {'states': [self.original_trajectory['states'][self.starting_step]], 'actions': [], 'rewards': [self.original_trajectory['rewards'][self.starting_step]]}
+        self.update_cf_traj = []
         for action in self.start_cf_traj:
             next_state, done = self.apply_action_to_env(env, action)
     
@@ -234,8 +260,8 @@ class Node():
     """ Return true if and only if all child actions have been expanded """
     # TODO: exclude actions that are below a threshold according to the ppo policy
     def is_fully_expanded(self):
-        valid_actions = self.mdp.get_actions(self.state)
-        if len(valid_actions) == len(self.children):
+        valid_actions = self.mdp.get_actions(self.state)  - self.children.keys()
+        if len(valid_actions) == 0:
             return True
         else:
             return False
@@ -250,12 +276,13 @@ class Node():
             return self.get_outcome_child(action).select()
 
     """ Expand a node if it is not a terminal node """
-    # TODO: only consider actions above a threshold according to the ppo policy
     # TODO: choose based on quality of state s' after action has been applied
     def expand(self):
         if not self.mdp.is_terminal(self.trajectory):
             # Randomly select an unexpanded action to expand
             actions = self.mdp.get_actions(self.state) - self.children.keys()
+            if actions == {}:
+                a=0
             action = random.choice(list(actions))
 
             self.children[action] = []
@@ -318,12 +345,13 @@ class MCTS:
     def mcts(self, timeout=1, root_node=None):
         if root_node is None:
             root_node = self.create_root_node()
+        else:
+            root_node.mdp = self.mdp
 
         start_time = time.time()
         current_time = time.time()
         iteration = 0
         while current_time < start_time + timeout:
-            print("Iteration: ", iteration)
             iteration += 1
             # Find a state node to expand
             selected_node = root_node.select()
@@ -333,8 +361,10 @@ class MCTS:
                 reward = self.simulate(child)
                 selected_node.back_propagate(reward, child)
 
+
             current_time = time.time()
 
+        print("Number of iterations", iteration)
         return root_node
     
     """ Choose a random action. Heustics can be used here to improve simulations. """
@@ -360,6 +390,8 @@ class MCTS:
         cumulative_reward = 0.0
         depth = 0
         done = False
+        if node.action==9:
+            cumulative_reward = self.mdp.get_reward()
         while not self.mdp.is_terminal(trajectory) and not done:
             # Choose an action to execute
             action = self.choose(state)
@@ -402,6 +434,9 @@ class UpperConfidenceBounds():
 
         max_actions = []
         max_value = float("-inf")
+        # remove the item 9 from the actions if it exists. This avoids resampling the action 9. 9 does not have to be resampled, because there is not tree of actions below it
+        if 9 in actions:
+            actions.remove(9)
         for action in actions:
             value = qfunction.get_q_value(trajectory, action) + math.sqrt(
                 (2 * math.log(self.total)) / self.times_selected[action]

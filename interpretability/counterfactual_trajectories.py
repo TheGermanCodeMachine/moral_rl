@@ -49,7 +49,7 @@ class config:
     criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
     # criteria = ['baseline']
     # criteria = ['validity']
-    cf_method = 'deviation' # 'mcts' or 'deviation'
+    cf_method = 'mcts' # 'mcts' or 'deviation'
 
 # tests whether the current state is in the set of states that have been visited in the orignial trajectory after timestep step
 def test_rejoined_org_traj(org_traj, state, step, start):
@@ -118,10 +118,20 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env):
     critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
     critical_states.sort(key=lambda x: x[0], reverse=True)
     critical_states = critical_states[:5]
+
+    part_orgs, part_cfs, q_values = [], [], []
     for (i, starting_position) in critical_states:
-        run_mcts_from(vec_env_cf, org_traj, starting_position, ppo, discriminator, seed_env)
+        part_org, part_cf, q_value = run_mcts_from(vec_env_cf, org_traj, starting_position, ppo, discriminator, seed_env)
+        part_orgs.append(part_org)
+        part_cfs.append(part_cf)
+        q_values.append(q_value)
 
-
+    # select the best counterfactual trajectory
+    sort_index = np.argmax(q_values)
+    chosen_part_org = part_orgs[sort_index]
+    chosen_part_cf = part_cfs[sort_index]
+    chosen_start = critical_states[sort_index][1]
+    return chosen_part_org, chosen_part_cf, chosen_start
 
 def generate_counterfactuals(org_traj, ppo, discriminator, seed_env):
     # Now we make counterfactual trajectories by changing one action at a time and see how the reward changes
@@ -246,7 +256,7 @@ if __name__ == '__main__':
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
     discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
 
-    all_org_trajs, all_cf_trajs, all_starts, all_end_orgs, all_end_cfs, all_part_orgs, all_part_cfs, all_full_orgs, random_baseline_cfs, random_baseline_orgs = [], [], [], [], [], [], [], [], [], []
+    all_org_trajs, all_cf_trajs, all_starts, all_end_orgs, all_end_cfs, all_part_orgs, all_part_cfs, random_baseline_cfs, random_baseline_orgs = [], [], [], [], [], [], [], [], []
     lengths_org, lengths_cf, start_points, quality_criteria, effiencies, qc_statistics = [], [], [], [], [], []
 
     # load the original trajectories
@@ -263,7 +273,14 @@ if __name__ == '__main__':
 
         # generate the counterfactual trajectories
         if config.cf_method == 'mcts':
-            chosen_counterfactual, counterfactual_rewards, chosen_start, chosen_end_cf, chosen_end_org = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
+            part_org, part_cf, chosen_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
+            
+            efficiency = time.time() - time_start
+
+            part_rewards = sum(part_org['rewards'])
+            all_part_orgs.append((part_org, part_rewards))
+            part_rewards_cf = sum(part_cf['rewards'])
+            all_part_cfs.append((part_cf, part_rewards_cf))
         else:
             counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
             if not baseline:
@@ -279,26 +296,25 @@ if __name__ == '__main__':
             chosen_end_cf = end_cfs[sort_index]
             chosen_end_org = end_orgs[sort_index]
 
-        efficiency = time.time() - time_start
+            efficiency = time.time() - time_start
+
+            part_org = partial_trajectory(org_traj, chosen_start, chosen_end_org)
+            part_rewards = sum(part_org['rewards'])
+            all_part_orgs.append((part_org, part_rewards))
+
+            part_cf = partial_trajectory(chosen_counterfactual_trajectory, chosen_start, chosen_end_cf)
+            part_rewards_cf = sum(part_cf['rewards'])
+            all_part_cfs.append((part_cf, part_rewards_cf))
 
         # uncomment below if the trajectories should be visualized:
         # visualize_two_part_trajectories(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_cf,  chosen_end_org)
 
-        part_org = partial_trajectory(org_traj, chosen_start, chosen_end_org)
-        part_rewards = sum(part_org['rewards'])
-        all_part_orgs.append((part_org, part_rewards))
 
-        part_cf = partial_trajectory(chosen_counterfactual_trajectory, chosen_start, chosen_end_cf)
-        part_rewards_cf = sum(part_cf['rewards'])
-        all_part_cfs.append((part_cf, part_rewards_cf))
-
-        full_rewards = sum(org_traj['rewards'])
-        all_full_orgs.append((org_traj, chosen_start, chosen_end_cf+1 - chosen_start, full_rewards))
 
         if config.measure_statistics:
             # record stastics
-            lengths_org.append(chosen_end_org+1 - chosen_start)
-            lengths_cf.append(chosen_end_cf+1 - chosen_start)
+            lengths_org.append(len(part_org['states']))
+            lengths_cf.append(len(part_cf['states']))
             start_points.append(chosen_start)
             chosen_val, chosen_prox, chosen_crit, chosen_dive = evaluate_qcs_for_cte(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_org, chosen_end_cf, ppo, all_org_trajs, all_cf_trajs, all_starts, all_end_cfs, all_end_orgs)
             quality_criteria.append((chosen_val, chosen_prox, chosen_crit, chosen_dive))
@@ -330,8 +346,6 @@ if __name__ == '__main__':
         pickle.dump(all_part_orgs, f)
     with open(path_folder + '\cf_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_cfs, f)
-    with open(path_folder + '\\full_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_full_orgs, f)
 
     if config.measure_statistics:
         # saving statistics

@@ -49,6 +49,7 @@ def distance_subtrajectories(traj1, traj2):
     # calucalte the distance between every state-action pair in traj1 and traj2
     dist_table = np.zeros((len(traj1['states']), len(traj2['states'])))
     act_diffs, cit_divs, pos_divs = np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states']))), np.zeros((len(traj1['states']), len(traj2['states'])))
+
     for i in range(len(traj1['states'])):
         for j in range(len(traj2['states'])):
             dist_table[i,j] = state_action_diff(traj1['states'][i], traj1['actions'][i], traj2['states'][j], traj2['actions'][j])
