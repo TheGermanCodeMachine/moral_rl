@@ -25,9 +25,9 @@ class hyperparameters:
     
 class config:    
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
-    model_type = 'NN' # model_type = 'NN' or 'linear'
+    model_type = 'linear' # model_type = 'NN' or 'linear'
     data_folds = 5
-    results_path = "\\results_sidebyside\\" # Foldername to save results to
+    results_path = "\\results_sidebysideLM\\" # Foldername to save results to
     print_plot = False
     print_examples = False
     print_weights = False
@@ -241,7 +241,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
     all_train_losses = np.mean(all_train_losses, axis=0)
     all_test_losses = np.mean(all_test_losses, axis=0)
     show_loss_plot(all_train_losses, all_test_losses, show=config.print_plot, save_path=results_path, epochs=epochs)
-    print('predicition label pairs', pred_label_pairs)
+    # print('predicition label pairs', pred_label_pairs)
 
     print('test_loss_ood', np.mean(test_loss_oods))
     print('test mean error ood', np.mean(test_mean_error_oods))
@@ -257,7 +257,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
 
         save_results(to_save, results_path, baseline, type='results', data_mixture=(0,0), con=True)
 
-        hyper_params = {'epochs': epochss, 'learning_rate': learning_rates, 'l2_regularisation': regularisations}
+        hyper_params = {'epochs': epochs, 'learning_rate': learning_rate, 'l2_regularisation': regularisation, "num_layers": num_layers, "hidden_sizes": hidden_sizes}
         save_results(hyper_params, results_path, baseline, type='hyper_params', data_mixture=(0,0))
 
         to_save = {'test_losses': test_loss_oods, 'test_mean_errors': test_mean_error_oods, 'test_rmses': test_rmse_oods, 'pearson_correlations': pearson_correlation_oods, 'spearman_correlations': spearman_correlation_oods, 'pred_label_pairs': pred_label_pairs_oods, 'r2s': r2_oods}
@@ -297,9 +297,10 @@ def hyper_param_optimization(train_set, train_labels):
 
     # different NN architectures with (number of layers, hidden layer sizes)
     if config.model_type == 'NN':
-        architectures = [(4, [[8,4], [8,8], [12,6], [12,12], [16,8], [16,16], [20,20]]), (5, [[16,12,8], [20,20,10], [16,16,16]])]
+        architectures = [(2, [[]]), (3, [[16], [8]]), (4, [[8,4], [8,8], [12,6], [12,12], [16,8], [16,16], [20,20]]), (5, [[16,12,8], [20,20,10], [16,16,16]])]
+        architectures = [(2, [[]]), (3, [[16], [8]]), (4, [[8,4], [8,8], [12,6], [12,12], [16,8], [16,16], [20,20]])]
         # architectures = [(4, [[8,4], [16,8], [16,16]]), (5, [[16,12,8], [16,16,16]])]
-        architectures = [(5, [[16,16,16]])]
+        # architectures = [(5, [[16,16,16]])]
     else:
         architectures = [(None, [None])]
     learning_rates = [0.001, 0.01, 0.1, 0.3]
@@ -318,7 +319,7 @@ def hyper_param_optimization(train_set, train_labels):
                     test_lossess = []
                     for k in range(data_folds):
                         train_set_f, train_labels_f, validation_set_f, validation_labels_f = cross_validate(train_set_folds, train_labels_folds, k)
-                        model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features, hyperparameters.epochs_contrastive, lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size)
+                        model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features, epochs = hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2, num_layers=num_layers, hidden_layer_sizes=hidden_layer_size)
                         test_lossess.append(test_losses)
 
                     # show_loss_plot(train_losses, test_losses, show=False, lr=lrs, l2=l2)
@@ -353,7 +354,7 @@ if __name__ == '__main__':
     path_org_cte = folder_path + '\org_features.pkl'
     path_cf_cte = folder_path + '\cf_features.pkl'
 
-    training_numbers = [5,10,20,50,100,200,500,800]
+    training_numbers = [5,10,20,50, 100, 200, 500, 800]
     for n_train in training_numbers:
         print(n_train)
         learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=n_train)

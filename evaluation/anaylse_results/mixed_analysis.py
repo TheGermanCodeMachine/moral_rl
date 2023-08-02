@@ -7,6 +7,7 @@ import pickle
 import numpy as np
 from helpers.folder_util_functions import read, write
 from tabulate import tabulate
+import matplotlib.pyplot as plt
 
 def analyse_data_mixtures():
     base_path = "datasets\\100_ablations_3\\pvcd100\\results_mixedNN\\"
@@ -125,4 +126,61 @@ def analyse_task_weights():
 
     print(tabulate(table))
 
-analyse_data_mixtures()
+def analyse_num_data():
+    base_path = "datasets\\1000\\1000\\results_sidebyside"
+    it = [5,10,20,50,100,200,500,800]
+    data_5 = read(base_path + "\\5\\contrastive__counterfactual.pkl")
+    data_5_ood = read(base_path + "\\5\\contrastive__counterfactual_ood.pkl")
+    data_10 = read(base_path + "\\10\\contrastive__counterfactual.pkl")
+    data_10_ood = read(base_path + "\\10\\contrastive__counterfactual_ood.pkl")
+    data_20 = read(base_path + "\\20\\contrastive__counterfactual.pkl")
+    data_20_ood = read(base_path + "\\20\\contrastive__counterfactual_ood.pkl")
+    data_50 = read(base_path + "\\50\\contrastive__counterfactual.pkl")
+    data_50_ood = read(base_path + "\\50\\contrastive__counterfactual_ood.pkl")
+    data_100 = read(base_path + "\\100\\contrastive__counterfactual.pkl")
+    data_100_ood = read(base_path + "\\100\\contrastive__counterfactual_ood.pkl")
+    data_200 = read(base_path + "\\200\\contrastive__counterfactual.pkl")
+    data_200_ood = read(base_path + "\\200\\contrastive__counterfactual_ood.pkl")
+    data_500 = read(base_path + "\\500\\contrastive__counterfactual.pkl")
+    data_500_ood = read(base_path + "\\500\\contrastive__counterfactual_ood.pkl")
+    data_800 = read(base_path + "\\800\\contrastive__counterfactual.pkl")
+    data_800_ood = read(base_path + "\\800\\contrastive__counterfactual_ood.pkl")
+
+    table = [
+        ["amount of data", "contrastive", "contrastive ood"],
+        ["5", round(np.mean(data_5['test_mean_errors']),2), round(np.mean(data_5_ood['test_mean_errors']),2)],
+        ["10", round(np.mean(data_10['test_mean_errors']),2), round(np.mean(data_10_ood['test_mean_errors']),2)],
+        ["20", round(np.mean(data_20['test_mean_errors']),2), round(np.mean(data_20_ood['test_mean_errors']),2)],
+        ["50", round(np.mean(data_50['test_mean_errors']),2), round(np.mean(data_50_ood['test_mean_errors']),2)],
+        ["100", round(np.mean(data_100['test_mean_errors']),2), round(np.mean(data_100_ood['test_mean_errors']),2)],
+        ["200", round(np.mean(data_200['test_mean_errors']),2), round(np.mean(data_200_ood['test_mean_errors']),2)],
+        ["500", round(np.mean(data_500['test_mean_errors']),2), round(np.mean(data_500_ood['test_mean_errors']),2)],
+        ["800", round(np.mean(data_800['test_mean_errors']),2), round(np.mean(data_800_ood['test_mean_errors']),2)],
+    ]
+    print(tabulate(table))
+
+    # plot the values from the table
+    test_mean_errors = [np.mean(data_5["test_mean_errors"]), np.mean(data_10["test_mean_errors"]), np.mean(data_20["test_mean_errors"]), np.mean(data_50["test_mean_errors"]), np.mean(data_100["test_mean_errors"]), np.mean(data_200["test_mean_errors"]), np.mean(data_500["test_mean_errors"]), np.mean(data_800["test_mean_errors"])]
+    plt.plot(it, test_mean_errors, label="test mean errors")
+    spearman_correlations = [np.mean(data_5["spearman_correlations"]), np.mean(data_10["spearman_correlations"]), np.mean(data_20["spearman_correlations"]), np.mean(data_50["spearman_correlations"]), np.mean(data_100["spearman_correlations"]), np.mean(data_200["spearman_correlations"]), np.mean(data_500["spearman_correlations"]), np.mean(data_800["spearman_correlations"])]
+    plt.plot(it, spearman_correlations, label="spearman correlations")
+    pearson_correlations = [np.mean(data_5["pearson_correlations"]), np.mean(data_10["pearson_correlations"]), np.mean(data_20["pearson_correlations"]), np.mean(data_50["pearson_correlations"]), np.mean(data_100["pearson_correlations"]), np.mean(data_200["pearson_correlations"]), np.mean(data_500["pearson_correlations"]), np.mean(data_800["pearson_correlations"])]
+    plt.plot(it, pearson_correlations, label="pearson correlations")
+    r2s = [np.mean(data_5["r2s"]), np.mean(data_10["r2s"]), 0, np.mean(data_50["r2s"]), np.mean(data_100["r2s"]), np.mean(data_200["r2s"]), np.mean(data_500["r2s"]), np.mean(data_800["r2s"])]
+    plt.plot(it, r2s, label="r2s")
+    plt.legend()
+    plt.show()
+
+    test_mean_error_ood = [np.mean(data_5_ood["test_mean_errors"]), np.mean(data_10_ood["test_mean_errors"]), np.mean(data_20_ood["test_mean_errors"]), np.mean(data_50_ood["test_mean_errors"]), np.mean(data_100_ood["test_mean_errors"]), np.mean(data_200_ood["test_mean_errors"]), np.mean(data_500_ood["test_mean_errors"]), np.mean(data_800_ood["test_mean_errors"])]
+    plt.plot(it, test_mean_error_ood, label="test mean errors")
+    spearman_correlations_ood = [np.mean(data_5_ood["spearman_correlations"]), np.mean(data_10_ood["spearman_correlations"]), np.mean(data_20_ood["spearman_correlations"]), np.mean(data_50_ood["spearman_correlations"]), np.mean(data_100_ood["spearman_correlations"]), np.mean(data_200_ood["spearman_correlations"]), np.mean(data_500_ood["spearman_correlations"]), np.mean(data_800_ood["spearman_correlations"])]
+    plt.plot(it, spearman_correlations_ood, label="spearman correlations")
+    pearson_correlations_ood = [np.mean(data_5_ood["pearson_correlations"]), np.mean(data_10_ood["pearson_correlations"]), np.mean(data_20_ood["pearson_correlations"]), np.mean(data_50_ood["pearson_correlations"]), np.mean(data_100_ood["pearson_correlations"]), np.mean(data_200_ood["pearson_correlations"]), np.mean(data_500_ood["pearson_correlations"]), np.mean(data_800_ood["pearson_correlations"])]
+    plt.plot(it, pearson_correlations_ood, label="pearson correlations")
+    r2s_ood = [np.mean(data_5_ood["r2s"]), np.mean(data_10_ood["r2s"]), 0, np.mean(data_50_ood["r2s"]), np.mean(data_100_ood["r2s"]), np.mean(data_200_ood["r2s"]), np.mean(data_500_ood["r2s"]), np.mean(data_800_ood["r2s"])]
+    plt.plot(it, r2s_ood, label="r2s")
+    plt.legend()
+    plt.show()
+
+
+analyse_num_data()
