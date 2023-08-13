@@ -73,7 +73,7 @@ def could_have_saved_state(state):
     c_xs, c_ys = extract_citizens_positions(state)
     if len(c_xs)==0: return 0
     for c_x, c_y in zip(c_xs, c_ys):
-        if abs(p_x - c_x) + abs(p_y - c_y) == 1: return 1
+        if abs(p_x - c_x) + abs(p_y - c_y) == 1: return 1   
     return 0
 
 # MEASURE: How many unsaved citizens are there at the end of the trajectory?

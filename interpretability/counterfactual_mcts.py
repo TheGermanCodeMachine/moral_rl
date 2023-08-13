@@ -139,7 +139,7 @@ class MDP():
             self.update_cf_traj.append(action)
             return self.full_cf_traj['states'][-1] , True
         else:
-            next_state, reward, done, info = env.step([action])
+            next_state, reward, done, info = env.step([action]) 
             state_tensor = torch.tensor(next_state).float().to(device)
             self.full_cf_traj['states'].append(state_tensor)
             self.full_cf_traj['actions'].append(action)
@@ -151,6 +151,8 @@ class MDP():
         
     def get_reward(self):
         org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(self.update_cf_traj)-1+self.starting_step)
+        if len(self.full_cf_traj['actions']) ==0:
+            a=0
         return evaluate_qc(org_traj, self.full_cf_traj, qc_criteria_to_use, normalisation)
     
 
@@ -271,7 +273,12 @@ class Node():
         else:
             actions = list(self.children.keys())
             action = self.bandit.select(self.trajectory, actions, self.qfunction)
-            return self.get_outcome_child(action).select()
+            rec = self.get_outcome_child(action)
+            rec.mdp.reset_env()
+            for a in rec.trajectory:
+                (next_state, reward, done) = rec.mdp.execute(a)
+            recsel = rec.select()
+            return recsel
 
     """ Expand a node if it is not a terminal node """
     # TODO: choose based on quality of state s' after action has been applied
@@ -284,8 +291,9 @@ class Node():
             action = random.choice(list(actions))
 
             self.children[action] = []
-            return self.get_outcome_child(action)
-        return self
+            outcome = self.get_outcome_child(action)
+            return outcome
+        return self, 0, 0
     
     """ Backpropogate the reward back to the parent node """
     def back_propagate(self, reward, child):
@@ -315,7 +323,7 @@ class Node():
         for (child, _) in self.children[action]:
             if traj == child.trajectory:
                 return child
-
+                # return child
         # This outcome has not occured from this state-action pair previously
         new_child = Node(
             self.mdp, self, next_state, self.trajectory + [action], self.qfunction, self.bandit, reward, action
@@ -351,14 +359,17 @@ class MCTS:
         iteration = 0
         while current_time < start_time + timeout:
             iteration += 1
+            if iteration == 6:
+                a=0
             # Find a state node to expand
             selected_node = root_node.select()
+            if len(selected_node.mdp.update_cf_traj) > len(selected_node.mdp.start_cf_traj)+5 or len(selected_node.mdp.update_cf_traj) > 20:
+                a=0
             if not self.mdp.is_terminal(selected_node.trajectory):
 
                 child = selected_node.expand()
                 reward = self.simulate(child)
                 selected_node.back_propagate(reward, child)
-
 
             current_time = time.time()
 

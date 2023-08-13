@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 from scipy.stats import pearsonr, spearmanr
 import matplotlib.pyplot as plt
+from tabulate import tabulate
 
 class config:
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
@@ -95,6 +96,9 @@ def get_statistics(data):
     start_points = np.mean(pickle.load(open(statistics_path + "\\start_points.pkl", 'rb')))
     org_feature_stats = pickle.load(open(statistics_path + "\\org_feature_stats.pkl", 'rb'))
     cf_feature_stats = pickle.load(open(statistics_path + "\\cf_feature_stats.pkl", 'rb'))
+    qc_statistics = pickle.load(open(statistics_path + "\\qc_statistics.pkl", 'rb'))
+
+
     if config.print_stuff:
         print("efficiencies: ", efficiencies)
         print("lengths_cf: ", lengths_cf)
@@ -112,10 +116,10 @@ def get_statistics(data):
         print(round(quality_criteria[0], 2))
         print(round(quality_criteria[2], 2))
         print(round(quality_criteria[3], 2))
-    output = {'efficiencies': efficiencies, 'lengths_cf': lengths_cf, 'lengths_org': lengths_org, 'quality_criteria': quality_criteria, 'start_points': start_points, 'org_feature_stats': org_feature_stats, 'cf_feature_stats': cf_feature_stats}
+    output = {'efficiencies': efficiencies, 'lengths_cf': lengths_cf, 'lengths_org': lengths_org, 'quality_criteria': quality_criteria, 'start_points': start_points, 'org_feature_stats': org_feature_stats, 'cf_feature_stats': cf_feature_stats, 'qc_statistics': qc_statistics}
     return output
 
-base_path = "datasets\\100_ablations_3"
+base_path = "datasets\\1000"
 
 model_type = 'LM' # 'LM' or 'NN2'
 
@@ -125,29 +129,57 @@ options_full = ['critical state', 'diversity', 'proximity', 'proximity-validity'
 results, results_ood, weights, statistics, feature_states = [], [], [], [], []
 
 # iterate through all the folders
-for folder in os.listdir(base_path):
-    folder = 'pvcd100'
-    if folder == 'description.txt' or folder == "baseline1":
-        continue   
-    # go into the results folder
-    results_path = os.path.join(base_path, folder, "results_normaliserewards" + model_type)
-    statistics_path = os.path.join(base_path, folder, "statistics")
-    # get the name of the folder
-    folder_name = os.path.basename(folder)
-    # get the name of used quality criteria
-    name_of_criteria = letters_to_words(folder_name)
-    # iterate through all the files in the results folder
-    
-    # get the specific file
-    
+# for folder in os.listdir(base_path):
+folder = 'baseline'
+# if folder == 'description.txt' or folder == "baseline1":
+#     continue   
+# go into the results folder
+results_path = os.path.join(base_path, folder, "results_sidebyside")
+statistics_path = os.path.join(base_path, folder, "statistics")
+# get the name of the folder
+folder_name = os.path.basename(folder)
+# get the name of used quality criteria
+name_of_criteria = letters_to_words(folder_name)
+# iterate through all the files in the results folder
 
-    # extract the results
-    results_data = pickle.load(open(results_path + "\\contrastive_learning_counterfactual.pkl", 'rb'))
-    results_data_ood = pickle.load(open(results_path + "\\contrastive_learning_counterfactual_ood.pkl", 'rb'))
-    # weights.append(get_weights(results_data))
-    results.append(get_results(results_data))
-    results_ood.append(get_results_ood(results_data_ood))
-    statistics.append(get_statistics(statistics_path))
+# get the specific file
+
+
+# extract the results
+results_data = pickle.load(open(results_path + "\contrastive__counterfactual.pkl", 'rb'))
+results_data_ood = pickle.load(open(results_path + "\contrastive__counterfactual_ood.pkl", 'rb'))
+# weights.append(get_weights(results_data))
+results.append(get_results(results_data))
+results_ood.append(get_results_ood(results_data_ood))
+statistics.append(get_statistics(statistics_path))
+
+table = [
+    ['measure', 'contastive', 'constrastive ood'],
+    ['mean error', round(results[0]['test_mean_errors'],2), round(results_ood[0]['test_mean_errors'],2)],
+    ['train mean error', round(results[0]['train_mean_errors'],2), 'nan'],
+    ['rmse', round(results[0]['test_rmse'],2), round(results_ood[0]['test_rmse'],2)],
+    ['r2', round(results[0]['r2'],2), round(results_ood[0]['r2'],2)],
+    ['pearson_correlations', round(results[0]['pearson_correlations'],2), round(results_ood[0]['pearson_correlations'],2)],
+    ['spearman_correlations', round(results[0]['spearman_correlations'],2), round(results_ood[0]['spearman_correlations'],2)],
+]
+print(tabulate(table, headers='firstrow'))
+print('')
+
+table = [
+    ['measure', 'contastive'],
+    ['length_cf', round(statistics[0]['lengths_cf'],2)],
+    ['length_org', round(statistics[0]['lengths_org'],2)],
+    ['start_points', round(statistics[0]['start_points'],2)],
+    ['validity', round(statistics[0]['quality_criteria'][0],2)],
+    ['proximity', round(statistics[0]['quality_criteria'][1],2)],
+    ['state importance', round(statistics[0]['quality_criteria'][2],2)],
+    ['diversity', round(statistics[0]['quality_criteria'][3],2)],
+    ['efficiency', round(statistics[0]['efficiencies'],2)],
+]
+print(tabulate(table, headers='firstrow'))
+ 
+
+10/0
 
 def print_header():
     print('& no qc & critical & diversity & proximity & proximity & proximity & proximity & proximity & validity \\\\')
@@ -196,7 +228,7 @@ print('\n')
 print('----------------correlations ----------------')
 # calculate correlations between factors and results
 # correlation between test_mean_error and length_cf
-print('mean_error, length_cf', pearsonr([result['test_mean_errors'] for result in results], [statistic['lengths_cf'] for statistic in statistics])[0])
+print('mean_error, length_cf', pearsonr([result['test_mean_errors'] for result in results_data], [statistic['lengths_cf'] for statistic in statistics])[0])
 # correlation between test_mean_error and length_org
 print('mean_error, length_org', pearsonr([result['test_mean_errors'] for result in results], [statistic['lengths_org'] for statistic in statistics])[0])
 # correlation between test_mean_error and start_points

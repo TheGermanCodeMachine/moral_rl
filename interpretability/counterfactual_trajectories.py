@@ -106,6 +106,39 @@ def test_same_next_state(states_tensor, next_state, org_action, cf_action):
             return False
     return True
     
+def generate_counterfactual_random(org_traj, ppo, discriminator, seed_env):
+    start = random.randint(0, len(org_traj['states'])-1)
+
+    vec_env_cf = VecEnv(config.env_id, config.n_workers, seed=seed_env)
+    states = vec_env_cf.reset()
+    states_tensor = torch.tensor(states).float().to(device)
+    
+    full_traj = {'states': [], 'actions': [], 'rewards': []}
+    full_traj, states_tensor = retrace_original(0, start, full_traj, org_traj, vec_env_cf, states_tensor, discriminator)
+    
+    action = -1
+    done = [False]
+    cf_traj = {'states': [], 'actions': [], 'rewards': []}
+    while not done[0] and action != 9:
+        cf_traj['states'].append(states_tensor)
+        cf_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
+
+        action_distribution = ppo.action_distribution_torch(states_tensor)
+        # remove all actions below the threshold
+
+        action_distribution = torch.cat((action_distribution, torch.tensor([0.2]).view(1,1)), 1)
+        m = Categorical(action_distribution)
+        action = m.sample()
+        action = action.item()
+        cf_traj['actions'].append(action)
+        state, reward, done, info = vec_env_cf.step([action])
+        states_tensor = torch.tensor(state).float().to(device)
+        
+
+    part_org_traj = partial_trajectory(org_traj, start, start + len(cf_traj['states']) - 1)
+    return part_org_traj, cf_traj, start
+
+
 
 def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env):
     
@@ -273,6 +306,7 @@ if __name__ == '__main__':
 
         # generate the counterfactual trajectories
         if config.cf_method == 'mcts':
+            random_org, random_cf, random_start = generate_counterfactual_random(org_traj, ppo, discriminator, seed_env)
             part_org, part_cf, chosen_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
             
             efficiency = time.time() - time_start
@@ -281,11 +315,11 @@ if __name__ == '__main__':
             all_part_orgs.append((part_org, part_rewards))
             part_rewards_cf = sum(part_cf['rewards'])
             all_part_cfs.append((part_cf, part_rewards_cf))
-        else:
+        
             counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
             if not baseline:
                 # use the quality criteria to determine the best counterfactual trajectory
-                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, config.criteria)
+                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, config.criteria, part_org, part_cf, chosen_start, random_org, random_cf, random_start)
                 qc_statistics.append(qc_stats)
             else:
                 # use a random baseline to determine the best counterfactual trajectory

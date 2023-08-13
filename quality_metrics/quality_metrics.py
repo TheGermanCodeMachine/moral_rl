@@ -32,49 +32,49 @@ def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_traj
     best_spar = sparsitiy_single_partial(org_traj, counterfactual_traj)
     return best_val, best_prox, best_crit, best_div, best_real, best_spar
 
-def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, criteria_to_use):
+def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, criteria_to_use, org_mcts=None, cf_mcts=None, start_mcts=None, org_random=None, cf_random=None, start_random=None):
 
     # fig, ax = plt.subplots()
     # xx = range(len(starts))
-    qc_values = [(x, 0) for x in range(len(counterfactual_rewards))]
+    qc_values = [(x, 0) for x in range(len(counterfactual_rewards)+1)]
     if 'validity' in criteria_to_use:
-        validity_qc = validity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
-        validity_qc = normalise_values_01(validity_qc)
+        validity_qc_abs = validity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
+        validity_qc = normalise_values_01(validity_qc_abs)
         # ax.plot(xx, validity_qc, 'ro', label='validity')
         # multiply by weight
         validity_qc = [val * weight['validity'] for val in validity_qc]
         # add to qc_values
         qc_values = [(x, qc_values[x][1] + validity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'proximity' in criteria_to_use:
-        proximity_qc = distance(org_traj, counterfactual_trajs, starts, end_cfs,end_orgs)
+        proximity_qc_abs = distance(org_traj, counterfactual_trajs, starts, end_cfs,end_orgs)
         # take the log to make the distibution more concave
-        proximity_qc = np.log(proximity_qc)
+        proximity_qc = np.log(proximity_qc_abs)
         proximity_qc = normalise_values_01(proximity_qc)
         # ax.plot(xx, [-i for i in proximity_qc], 'go', label='proximity')
         proximity_qc = [val * weight['proximity'] for val in proximity_qc]
         qc_values = [(x, qc_values[x][1] - proximity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'critical_state' in criteria_to_use:
-        critical_state_qc = critical_state(ppo, [counterfactual_traj['states'][starts[i]] for i, counterfactual_traj in enumerate(counterfactual_trajs)])
-        critical_state_qc = normalise_values_01(critical_state_qc)
+        critical_state_qc_abs = critical_state(ppo, [counterfactual_traj['states'][starts[i]] for i, counterfactual_traj in enumerate(counterfactual_trajs)])
+        critical_state_qc = normalise_values_01(critical_state_qc_abs)
         # ax.plot(xx, critical_state_qc, 'bo', label='critical_state')
         critical_state_qc = [val * weight['critical_state'] for val in critical_state_qc]
         qc_values = [(x, qc_values[x][1] + critical_state_qc[x]) for x in range(len(counterfactual_rewards))]
     # IN THIS VERSION OF DIVERSITY WE COMPUTE DIVERSITY FOR ALL COUNTERFACTUALS, WHICH TAKES MORE TIME
     if 'diversity' in criteria_to_use:
-        diversity_qc = diversity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs, all_org_trajs, all_cf_trajs, all_starts)
-        diversity_qc = normalise_values_01(diversity_qc)
+        diversity_qc_abs = diversity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs, all_org_trajs, all_cf_trajs, all_starts)
+        diversity_qc = normalise_values_01(diversity_qc_abs)
         # ax.plot(xx, diversity_qc, 'yo', label='diversity')
         diversity_qc = [val * weight['diversity'] for val in diversity_qc]
         qc_values = [(x, qc_values[x][1] + diversity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'realisticness' in criteria_to_use:
-        realisticness_qc = realisticness(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
-        realisticness_qc = normalise_values_01(realisticness_qc)
+        realisticness_qc_abs = realisticness(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
+        realisticness_qc = normalise_values_01(realisticness_qc_abs)
         # ax.plot(xx, realisticness_qc, 'co', label='realisticness')
         realisticness_qc = [val * weight['realisticness'] for val in realisticness_qc]
         qc_values = [(x, qc_values[x][1] + realisticness_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'sparsity' in criteria_to_use:
-        sparsity_qc = sparsity(starts, end_cfs, end_orgs)
-        sparsity_qc = normalise_values_01(sparsity_qc)
+        sparsity_qc_abs = sparsity(starts, end_cfs, end_orgs)
+        sparsity_qc = normalise_values_01(sparsity_qc_abs)
         # ax.plot(xx, sparsity_qc, 'mo', label='sparsity')
         sparsity_qc = [val * weight['sparsity'] for val in sparsity_qc]
         qc_values = [(x, qc_values[x][1] + sparsity_qc[x]) for x in range(len(counterfactual_rewards))]
@@ -203,7 +203,25 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     statistics = {'spear_correlations': spear_correlations, 'pear_correlations': pear_correlations, 'perc_positions': perc_positions, 'chosen_values': chosen_values}
 
     max_index = qc_values[0][0]
+    
+    compare_cte(org_mcts, cf_mcts, start_mcts, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
+    compare_cte(org_random, cf_random, start_random, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
+
     return max_index, statistics
+
+def compare_cte(org_traj_compare, cf_traj_compare, start_compare, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index):
+    validity_mcts = validity_single_partial(org_traj_compare, cf_traj_compare)
+    proximity_mcts = distance_subtrajectories(org_traj_compare, cf_traj_compare)
+    critical_state_mcts = critical_state_single(ppo, org_traj_compare['states'][0])
+    diversity_mcts = diversity_single(org_traj_compare, cf_traj_compare, start_compare, all_org_trajs, all_cf_trajs, all_starts)
+    realisticness_mcts = realisticness_single_partial(org_traj_compare, cf_traj_compare)
+    sparsity_mcts = sparsitiy_single_partial(org_traj_compare, cf_traj_compare)
+    print('validity_mcts', round(validity_mcts,2), 'chosen_cf', round(validity_qc_abs[max_index],2), 'best validity', round(max(validity_qc_abs),2))
+    print('proximity_mcts', round(proximity_mcts,2), 'chosen_cf', round(proximity_qc_abs[max_index],2), 'best proximity', round(min(proximity_qc_abs),2))
+    print('critical_state_mcts', round(critical_state_mcts,2), 'chosen_cf', round(critical_state_qc_abs[max_index],2), 'best critical_state', round(max(critical_state_qc_abs),2))
+    print('diversity_mcts', round(diversity_mcts,2), 'chosen_cf', round(diversity_qc_abs[max_index],2), 'best diversity', round(max(diversity_qc_abs),2))
+    print('realisticness_mcts', round(realisticness_mcts,2), 'chosen_cf', round(realisticness_qc_abs[max_index],2), 'best realisticness', round(max(realisticness_qc_abs),2))
+    print('sparsity_mcts', round(sparsity_mcts,2), 'chosen_cf', round(sparsity_qc_abs[max_index],2), 'best sparsity', round(max(sparsity_qc_abs),2))
 
 # this function gives the evaluation for trajectories created with the mcts method.
 # It does not take into account critical state and diversity
