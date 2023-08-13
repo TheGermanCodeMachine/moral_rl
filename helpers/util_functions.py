@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 def extract_player_position(state):
-    if len(state[0]==1):
+    if state.shape[0]==1:
         pos_tensor = np.argwhere(state[0][1] == 1).squeeze(0)
     else:
         pos_tensor = np.argwhere(state[1] == 1).squeeze(0)

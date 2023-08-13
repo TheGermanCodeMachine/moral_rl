@@ -204,7 +204,9 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
 
     max_index = qc_values[0][0]
     
+    print('MCTS:')
     compare_cte(org_mcts, cf_mcts, start_mcts, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
+    print('randomly chosen')
     compare_cte(org_random, cf_random, start_random, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
 
     return max_index, statistics
@@ -216,12 +218,12 @@ def compare_cte(org_traj_compare, cf_traj_compare, start_compare, ppo, all_org_t
     diversity_mcts = diversity_single(org_traj_compare, cf_traj_compare, start_compare, all_org_trajs, all_cf_trajs, all_starts)
     realisticness_mcts = realisticness_single_partial(org_traj_compare, cf_traj_compare)
     sparsity_mcts = sparsitiy_single_partial(org_traj_compare, cf_traj_compare)
-    print('validity_mcts', round(validity_mcts,2), 'chosen_cf', round(validity_qc_abs[max_index],2), 'best validity', round(max(validity_qc_abs),2))
-    print('proximity_mcts', round(proximity_mcts,2), 'chosen_cf', round(proximity_qc_abs[max_index],2), 'best proximity', round(min(proximity_qc_abs),2))
-    print('critical_state_mcts', round(critical_state_mcts,2), 'chosen_cf', round(critical_state_qc_abs[max_index],2), 'best critical_state', round(max(critical_state_qc_abs),2))
-    print('diversity_mcts', round(diversity_mcts,2), 'chosen_cf', round(diversity_qc_abs[max_index],2), 'best diversity', round(max(diversity_qc_abs),2))
-    print('realisticness_mcts', round(realisticness_mcts,2), 'chosen_cf', round(realisticness_qc_abs[max_index],2), 'best realisticness', round(max(realisticness_qc_abs),2))
-    print('sparsity_mcts', round(sparsity_mcts,2), 'chosen_cf', round(sparsity_qc_abs[max_index],2), 'best sparsity', round(max(sparsity_qc_abs),2))
+    print('validity', round(validity_mcts,2), 'chosen_cf', round(validity_qc_abs[max_index],2), 'best validity', round(max(validity_qc_abs),2))
+    print('proximity', round(proximity_mcts,2), 'chosen_cf', round(proximity_qc_abs[max_index],2), 'best proximity', round(min(proximity_qc_abs),2))
+    print('critical_state', round(critical_state_mcts,2), 'chosen_cf', round(critical_state_qc_abs[max_index],2), 'best critical_state', round(max(critical_state_qc_abs),2))
+    print('diversity', round(diversity_mcts,2), 'chosen_cf', round(diversity_qc_abs[max_index],2), 'best diversity', round(max(diversity_qc_abs),2))
+    print('realisticness', round(realisticness_mcts,2), 'chosen_cf', round(realisticness_qc_abs[max_index],2), 'best realisticness', round(max(realisticness_qc_abs),2))
+    print('sparsity', round(sparsity_mcts,2), 'chosen_cf', round(sparsity_qc_abs[max_index],2), 'best sparsity', round(max(sparsity_qc_abs),2))
 
 # this function gives the evaluation for trajectories created with the mcts method.
 # It does not take into account critical state and diversity

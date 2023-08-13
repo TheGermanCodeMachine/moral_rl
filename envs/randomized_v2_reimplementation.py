@@ -1,12 +1,13 @@
 from helpers.util_functions import extract_player_position
+from copy import deepcopy
+import torch
 '''
 In randomized_v2 the objects contained are:
 - Matrix 0: borders of the environment
 - Matrix 1: the player
 - Matrix 2: citizens
-- Matrix 3: unused
+- Matrix 3: houses
 - Matrix 4: fire extinguisher
-- Matrix 5: houses
 
 actions:
 - 0: go upwards
@@ -29,13 +30,13 @@ def legal_field(next_state, action, x, y):
     if next_state[0][x][y] == 1:
         return False
     # collides with house
-    elif next_state[5][x][y] == 1:
+    elif next_state[3][x][y] == 1:
         return False
     return True
 
 # returns the new state and whether the game is over
-def step(state, action, num_step):
-    next_state = state.copy()
+def step_v2(state, action, num_step):
+    next_state = deepcopy(state).squeeze(dim=0)
     if num_step >= MAX_STEPS:
         return next_state, True, num_step
     else:
@@ -85,8 +86,10 @@ def step(state, action, num_step):
         elif action == 8:
             x, y = p_x + 1, p_y
             next_state[2][x][y] = 0
+        
+        next_state = next_state.unsqueeze(dim=0)
         # quit game?
-        elif action == 9:
+        if action == 9:
             return next_state, True, num_step
         return next_state, False, num_step
 

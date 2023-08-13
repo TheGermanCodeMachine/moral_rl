@@ -142,10 +142,6 @@ def generate_counterfactual_random(org_traj, ppo, discriminator, seed_env):
 
 def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env):
     
-    vec_env_cf = VecEnv(config.env_id, config.n_workers, seed=seed_env)
-    states = vec_env_cf.reset()
-    states_tensor = torch.tensor(states).float().to(device)
-
     critical_states = critical_state(ppo, org_traj['states'])
     # get the index of the 5 states with the highest critical state
     critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
@@ -154,7 +150,7 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env):
 
     part_orgs, part_cfs, q_values = [], [], []
     for (i, starting_position) in critical_states:
-        part_org, part_cf, q_value = run_mcts_from(vec_env_cf, org_traj, starting_position, ppo, discriminator, seed_env)
+        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env)
         part_orgs.append(part_org)
         part_cfs.append(part_cf)
         q_values.append(q_value)
@@ -310,6 +306,8 @@ if __name__ == '__main__':
             part_org, part_cf, chosen_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
             
             efficiency = time.time() - time_start
+            visualize_two_part_trajectories(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_cf,  chosen_end_org)
+
 
             part_rewards = sum(part_org['rewards'])
             all_part_orgs.append((part_org, part_rewards))
