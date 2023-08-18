@@ -26,8 +26,8 @@ if __name__ == '__main__':
         'env_steps': 6e6,
         'batchsize_ppo': 12,
         'n_workers': 12,
-        'lr_ppo': 5e-4,
-        'entropy_reg': 0.25,
+        'lr_ppo': 1e-4,
+        'entropy_reg': 0.1,
         'lambd': [1, 10],
         'gamma': 0.999,
         'epsilon': 0.1,
@@ -49,6 +49,7 @@ if __name__ == '__main__':
     # Initialize Models
     ppo = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
     optimizer = torch.optim.Adam(ppo.parameters(), lr=config.lr_ppo)
+    ppo.load_state_dict(torch.load('saved_models\\tmp\ppo_v2_[1, 10]tmp_20000.pt', map_location=torch.device('cpu')))
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)
 
     for t in tqdm(range(int(config.env_steps / config.n_workers))):
@@ -70,11 +71,11 @@ if __name__ == '__main__':
             dataset.reset_trajectories()
 
         if t % 10000 == 0:
-            torch.save(ppo.state_dict(), 'ppo_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
+            torch.save(ppo.state_dict(), 'saved_models/tmp/ppo_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
 
         # Prepare state input for next time step
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
 
     # vec_env.close()
-    torch.save(ppo.state_dict(), 'ppo_v2_' + str(config.lambd) + '.pt')
+    torch.save(ppo.state_dict(), 'saved_models/new_ppo_v2_' + str(config.lambd) + '.pt')
