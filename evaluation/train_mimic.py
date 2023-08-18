@@ -231,8 +231,10 @@ def learning_repeats(path_org, path_cf, base_path, baseline=0, data_mixture = (1
     path = base_path.split('\\')
     path = '\\'.join(path[:-1])
     # load the data
-    org_features_ood = read(path + '\\baseline\org_features.pkl')
-    cf_features_ood = read(path + '\\baseline\cf_features.pkl')
+    # org_features_ood = read(path + '\\baseline\org_features.pkl')
+    # cf_features_ood = read(path + '\\baseline\cf_features.pkl')
+    org_features_ood = read('datasets\\1000\\baseline\org_features.pkl')
+    cf_features_ood = read('datasets\\1000\\baseline\cf_features.pkl')
     test_set_ood_con, test_labels_ood_con, _ , _ = train_test_split_contrastive(org_features_ood, cf_features_ood, num_features, train_ratio=1)
     test_set_ood_sin, test_labels_ood_sin, _ , _ = train_test_split_single(org_features_ood, cf_features_ood, num_features, train_ratio=1)
 
@@ -461,7 +463,7 @@ def experiment_over_all_folders():
         print('\n')
 
 def experiment_for_single_folder():
-    folder_path = 'datasets\\1000\\1000'
+    folder_path = 'datasets\\100mcts\\10'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:

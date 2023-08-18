@@ -117,3 +117,24 @@ def visualize_two_part_trajectories(org_traj, cf_traj, start_part, end_part_cf, 
         print("Press the any key for the next step...")
         keyboard.read_event()
         time.sleep(0.2)
+
+def visualize_two_part_trajectories_part(org_traj, cf_traj):
+    end = max(len(org_traj['states']), len(cf_traj['states']))
+    
+    for i in range(0, end):
+        i_cf = min(i, len(cf_traj['states']))
+        i_org = min(i, len(org_traj['states']))
+        print('\033c')
+        print('Step: {}'.format(i))
+        # print the steps and rewards in one line
+        print('Reward this step - orginial: {} -counterfactual: {}'.format(org_traj['rewards'][i_org], cf_traj['rewards'][i_cf]))
+        print('Total reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'])/len(org_traj['states']), sum(cf_traj['rewards'])/len(cf_traj['states'])))
+        print('Original Trajectory      Counterfactual Trajectory')
+        if i == 0:
+            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf])
+        else:
+            paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf], org_traj['actions'][i_org-1], np.array([cf_traj['actions'][i_cf-1]]))
+        # wait for user to press any key
+        print("Press the any key for the next step...")
+        keyboard.read_event()
+        time.sleep(0.2)
