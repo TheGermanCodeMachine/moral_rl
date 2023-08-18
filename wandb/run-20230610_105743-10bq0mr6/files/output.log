@@ -1,5 +1,0 @@
-  0%|                                                                                                        | 0/330000 [00:00<?, ?it/s]
-Traceback (most recent call last):
-  File "c:\Users\janwe\OneDrive\Desktop\Master_Thesis\Other projects\moral_rl\moral\ppo_train_learned.py", line 63, in <module>
-    actions, log_probs = ppo.act(states_tensor)
-AttributeError: 'collections.OrderedDict' object has no attribute 'act'
