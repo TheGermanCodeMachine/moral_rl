@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 def extract_player_position(state):
     if state.shape[0]==1:
         pos_tensor = np.argwhere(state[0][1] == 1).squeeze(0)
@@ -45,3 +47,20 @@ def partial_trajectory(full_traj, start, end):
     return {'states' : full_traj['states'][start:end+1],
             'actions': full_traj['actions'][start:end+1],
             'rewards': full_traj['rewards'][start:end+1]}
+
+
+def retrace_original(start, divergence, counterfactual_traj, org_traj, vec_env_counter, states_tensor, discriminator):
+    # retrace the steps of original trajectory until the point of divergence
+    for i in range(start, divergence):
+        counterfactual_traj['states'].append(states_tensor)
+        counterfactual_traj['rewards'].append(discriminator.g(states_tensor)[0][0].item())
+        counterfactual_traj['actions'].append(org_traj['actions'][i])
+
+        next_states, reward, done, info = vec_env_counter.step(org_traj['actions'][i])
+        if done[0]:
+            next_states = vec_env_counter.reset()
+            break
+
+        states = next_states.copy()
+        states_tensor = torch.tensor(states).float().to(device)
+    return counterfactual_traj, states_tensor

@@ -22,6 +22,7 @@ import time
 from quality_metrics.quality_metrics import measure_quality, evaluate_qcs_for_cte, evaluate_qc
 from quality_metrics.distance_measures import distance_all as distance_all
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
+from quality_metrics.diversity_measures import diversity_single
 import pickle
 from helpers.parsing import sort_args, parse_attributes
 from collections import defaultdict
@@ -39,8 +40,31 @@ likelihood_terminal = 0.2
 discout_factor = 0.8
 terminal_state = (-1,-1)
 qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness']
-normalisation = {'proximity':0.5, 'sparsity':1/20, 'validity':1/4, 'realisticness':20, 'critical_state':2, 'diversity':1/8}
-timeout=5
+timeout=0.1
+
+def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts):
+    
+    critical_states = critical_state(ppo, org_traj['states'])
+    # get the index of the 5 states with the highest critical state
+    critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
+    critical_states.sort(key=lambda x: x[0], reverse=True)
+    critical_states = critical_states[:5]
+
+    part_orgs, part_cfs, q_values, divs = [], [], [], []
+    for (i, starting_position) in critical_states:
+        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env)
+        part_orgs.append(part_org)
+        part_cfs.append(part_cf)
+        q_values.append(q_value)
+        divs.append(diversity_single(part_org, part_cf, starting_position, prev_org_trajs, prev_cf_trajs, prev_starts))
+
+
+    # select the best counterfactual trajectory
+    sort_index = np.argmax(divs)
+    chosen_part_org = part_orgs[sort_index]
+    chosen_part_cf = part_cfs[sort_index]
+    chosen_start = critical_states[sort_index][1]
+    return chosen_part_org, chosen_part_cf, chosen_start
 
 def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env):
     chosen_action = -1
@@ -141,7 +165,7 @@ class MDP():
         
     def get_reward(self, trajectory):
         org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(trajectory)-1+self.starting_step)
-        return evaluate_qc(org_traj, trajectory, qc_criteria_to_use, normalisation)
+        return evaluate_qc(org_traj, trajectory, qc_criteria_to_use)
     
 
     def get_actions(self, state, traj_length):

@@ -20,8 +20,8 @@ from quality_metrics.sparsity_measure import sparsity_all as sparsity
 from quality_metrics.sparsity_measure import sparsitiy_single_partial
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
+from interpretability.normalising_qc import normalisation
 
-normalisation = {'proximity':0.5, 'sparsity':1/20, 'validity':1/4, 'realisticness':20, 'critical_state':2, 'diversity':1/8}
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
 
 def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_trajs, all_cf_trajs, all_starts):
@@ -210,7 +210,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
 # this function gives the evaluation for trajectories created with the mcts method.
 # It does not take into account critical state and diversity
 # It gives rewards for only 1 trajectory at a time, thus normalising is done beforehand by sampling random trajectories and evaluating the qc metrics on them
-def evaluate_qc(org_traj, cf_traj, criteria_to_use, normalisation):
+def evaluate_qc(org_traj, cf_traj, criteria_to_use):
     qc_value = 0
     if 'proximity' in criteria_to_use:
         proximity_qc = distance_subtrajectories(org_traj, cf_traj)

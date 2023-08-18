@@ -25,7 +25,7 @@ class hyperparameters:
     
 class config:    
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
-    model_type = 'linear' # model_type = 'NN' or 'linear'
+    model_type = 'NN' # model_type = 'NN' or 'linear'
     data_folds = 5
     results_path = "\\results_sidebysideLM\\" # Foldername to save results to
     print_plot = False
@@ -345,7 +345,7 @@ def hyper_param_optimization(train_set, train_labels):
     return best_epoch, best_lr, best_l2, best_num_layers, best_hidden_layer_sizes
 
 if __name__ == '__main__':
-    folder_path = 'datasets\\1000\\1000'
+    folder_path = 'datasets\\100mcts\\100'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:
@@ -354,7 +354,9 @@ if __name__ == '__main__':
     path_org_cte = folder_path + '\org_features.pkl'
     path_cf_cte = folder_path + '\cf_features.pkl'
 
-    training_numbers = [5,10,20,50, 100, 200, 500, 800]
-    for n_train in training_numbers:
-        print(n_train)
-        learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=n_train)
+    # training_numbers = [5,10,20,50, 100, 200, 500, 800]
+    # for n_train in training_numbers:
+        # print(n_train)
+        # learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=n_train)
+
+    learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=80)
