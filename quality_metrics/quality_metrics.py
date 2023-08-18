@@ -21,6 +21,7 @@ from quality_metrics.sparsity_measure import sparsitiy_single_partial
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
+normalisation = {'proximity':0.5, 'sparsity':1/20, 'validity':1/4, 'realisticness':20, 'critical_state':2, 'diversity':1/8}
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
 
 def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_trajs, all_cf_trajs, all_starts):
@@ -32,7 +33,7 @@ def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_traj
     best_spar = sparsitiy_single_partial(org_traj, counterfactual_traj)
     return best_val, best_prox, best_crit, best_div, best_real, best_spar
 
-def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, criteria_to_use, org_mcts=None, cf_mcts=None, start_mcts=None, org_random=None, cf_random=None, start_random=None):
+def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, criteria_to_use):
 
     # fig, ax = plt.subplots()
     # xx = range(len(starts))
@@ -161,7 +162,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     chosen_div = 2*diversity_qc[best_index]
     chosen_real = 5*realisticness_qc[best_index]
     chosen_spar = 2*sparsity_qc[best_index]
-    print('VALUES: validity:', validity_qc[best_index], 'proximity:', -proximity_qc[best_index]+1, 'critical_state:', 2*critical_state_qc[best_index], 'diversity:', 2*diversity_qc[best_index], 'realisticness', 5*realisticness_qc[best_index], 'sparsity', 2*sparsity_qc[best_index], 'qc:', qc_values[0][1])
+    # print('VALUES: validity:', validity_qc[best_index], 'proximity:', -proximity_qc[best_index]+1, 'critical_state:', 2*critical_state_qc[best_index], 'diversity:', 2*diversity_qc[best_index], 'realisticness', 5*realisticness_qc[best_index], 'sparsity', 2*sparsity_qc[best_index], 'qc:', qc_values[0][1])
 
     validity_qc = [(i,j) for i,j in enumerate(validity_qc)]
     validity_qc.sort(key=lambda x: x[1], reverse=True)
@@ -183,18 +184,18 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     pos_div = np.where(np.array([i[0] for i in diversity_qc])==best_index)[0][0]
     pos_real = np.where(np.array([i[0] for i in realisticness_qc])==best_index)[0][0]
     pos_spar = np.where(np.array([i[0] for i in sparsity_qc])==best_index)[0][0]
-    print('POSITIONS: validity:', pos_val / len(validity_qc), 'proximity:', pos_prox /len(proximity_qc), 'critical_state:', pos_crit/len(critical_state_qc), 'diversity:', pos_div/len(diversity_qc), 'realisticness', pos_real/len(realisticness_qc), 'sparsity', pos_spar/len(sparsity_qc))
+    # print('POSITIONS: validity:', pos_val / len(validity_qc), 'proximity:', pos_prox /len(proximity_qc), 'critical_state:', pos_crit/len(critical_state_qc), 'diversity:', pos_div/len(diversity_qc), 'realisticness', pos_real/len(realisticness_qc), 'sparsity', pos_spar/len(sparsity_qc))
 
-    fix, ax = plt.subplots()
-    ax.plot(range(len(validity_qc)), [i[1] for i in validity_qc], 'r-', label='validity')
-    ax.plot(range(len(proximity_qc)), [i[1] for i in proximity_qc], 'g-', label='proximity')
-    ax.plot(range(len(critical_state_qc)), [i[1] for i in critical_state_qc], 'b-', label='critical_state')
-    ax.plot(range(len(diversity_qc)), [i[1] for i in diversity_qc], 'c-', label='diversity')
-    ax.plot(range(len(realisticness_qc)), [i[1] for i in realisticness_qc], 'm-', label='realisticness')
-    ax.plot(range(len(sparsity_qc)), [i[1] for i in sparsity_qc], 'k-', label='sparsity')
-    ax.plot(range(len(qc_values)), [i[1] for i in qc_values], 'y-', label='qc')
-    plt.legend()
-    plt.show()
+    # fix, ax = plt.subplots()
+    # ax.plot(range(len(validity_qc)), [i[1] for i in validity_qc], 'r-', label='validity')
+    # ax.plot(range(len(proximity_qc)), [i[1] for i in proximity_qc], 'g-', label='proximity')
+    # ax.plot(range(len(critical_state_qc)), [i[1] for i in critical_state_qc], 'b-', label='critical_state')
+    # ax.plot(range(len(diversity_qc)), [i[1] for i in diversity_qc], 'c-', label='diversity')
+    # ax.plot(range(len(realisticness_qc)), [i[1] for i in realisticness_qc], 'm-', label='realisticness')
+    # ax.plot(range(len(sparsity_qc)), [i[1] for i in sparsity_qc], 'k-', label='sparsity')
+    # ax.plot(range(len(qc_values)), [i[1] for i in qc_values], 'y-', label='qc')
+    # plt.legend()
+    # plt.show()
 
     spear_correlations = {'qc-validity': qc_val_spear, 'qc-proximity': qc_prox_spear, 'qc-critical_state': qc_crit_spear, 'qc-diversity': qc_div_spear, 'qc-realisticness': qc_real_spear, 'qc-sparsity': qc_spar_spear, 'validity-proximity': val_prox_spear, 'validity-critical_state': val_crit_spear, 'validity-diversity': val_div_spear, 'proximity-critical_state': prox_crit_spear, 'proximity-diversity': prox_div_spear, 'critical_state-diversity': crit_div_spear}
     pear_correlations = {'qc-validity': qc_val_pear, 'qc-proximity': qc_prox_pear, 'qc-critical_state': qc_crit_pear, 'qc-diversity': qc_div_pear, 'qc-realisticness': qc_real_pear, 'qc-sparsity': qc_spar_pear, 'validity-proximity': val_prox_pear, 'validity-critical_state': val_crit_pear, 'validity-diversity': val_div_pear, 'proximity-critical_state': prox_crit_pear, 'proximity-diversity': prox_div_pear, 'critical_state-diversity': crit_div_pear}
@@ -204,26 +205,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
 
     max_index = qc_values[0][0]
     
-    print('MCTS:')
-    compare_cte(org_mcts, cf_mcts, start_mcts, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
-    print('randomly chosen')
-    compare_cte(org_random, cf_random, start_random, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index)
-
     return max_index, statistics
-
-def compare_cte(org_traj_compare, cf_traj_compare, start_compare, ppo, all_org_trajs, all_cf_trajs, all_starts, validity_qc_abs, proximity_qc_abs, critical_state_qc_abs, diversity_qc_abs, realisticness_qc_abs, sparsity_qc_abs, max_index):
-    validity_mcts = validity_single_partial(org_traj_compare, cf_traj_compare)
-    proximity_mcts = distance_subtrajectories(org_traj_compare, cf_traj_compare)
-    critical_state_mcts = critical_state_single(ppo, org_traj_compare['states'][0])
-    diversity_mcts = diversity_single(org_traj_compare, cf_traj_compare, start_compare, all_org_trajs, all_cf_trajs, all_starts)
-    realisticness_mcts = realisticness_single_partial(org_traj_compare, cf_traj_compare)
-    sparsity_mcts = sparsitiy_single_partial(org_traj_compare, cf_traj_compare)
-    print('validity', round(validity_mcts,2), 'chosen_cf', round(validity_qc_abs[max_index],2), 'best validity', round(max(validity_qc_abs),2))
-    print('proximity', round(proximity_mcts,2), 'chosen_cf', round(proximity_qc_abs[max_index],2), 'best proximity', round(min(proximity_qc_abs),2))
-    print('critical_state', round(critical_state_mcts,2), 'chosen_cf', round(critical_state_qc_abs[max_index],2), 'best critical_state', round(max(critical_state_qc_abs),2))
-    print('diversity', round(diversity_mcts,2), 'chosen_cf', round(diversity_qc_abs[max_index],2), 'best diversity', round(max(diversity_qc_abs),2))
-    print('realisticness', round(realisticness_mcts,2), 'chosen_cf', round(realisticness_qc_abs[max_index],2), 'best realisticness', round(max(realisticness_qc_abs),2))
-    print('sparsity', round(sparsity_mcts,2), 'chosen_cf', round(sparsity_qc_abs[max_index],2), 'best sparsity', round(max(sparsity_qc_abs),2))
 
 # this function gives the evaluation for trajectories created with the mcts method.
 # It does not take into account critical state and diversity
@@ -233,7 +215,7 @@ def evaluate_qc(org_traj, cf_traj, criteria_to_use, normalisation):
     if 'proximity' in criteria_to_use:
         proximity_qc = distance_subtrajectories(org_traj, cf_traj)
         proximity_qc = proximity_qc * normalisation['proximity'] * weight['validity']
-        qc_value += proximity_qc
+        qc_value -= proximity_qc
     if 'validity' in criteria_to_use:
         validity_qc = validity_single_partial(org_traj, cf_traj)
         validity_qc = validity_qc * normalisation['validity'] * weight['proximity']
@@ -247,3 +229,95 @@ def evaluate_qc(org_traj, cf_traj, criteria_to_use, normalisation):
         realisticness_qc = realisticness_qc * normalisation['realisticness'] * weight['realisticness']
         qc_value += realisticness_qc
     return qc_value
+
+def compare_cte_methods(org_mcts, cf_mcts, start_mcts, prev_org_trajs, prev_cf_trajs, prev_starts, criteria_to_use, ppo, org_step=None, cf_step=None, start_step=None, org_random=None, cf_random=None, start_random=None):
+    qc_mcts = 0
+    qc_step = 0
+    qc_random = 0
+    if 'proximity' in criteria_to_use:
+        prox_mcts = distance_subtrajectories(org_mcts, cf_mcts)
+        qc_mcts -= prox_mcts * normalisation['proximity'] * weight['proximity']
+        if org_step:
+            prox_step = distance_subtrajectories(org_step, cf_step)
+            prox_random = distance_subtrajectories(org_random, cf_random)
+            print('proximity:', round(prox_mcts, 2), round(prox_step, 2), round(prox_random, 2))
+            qc_step -= prox_step * normalisation['proximity'] * weight['proximity']
+            qc_random -= prox_random * normalisation['proximity'] * weight['proximity']
+        else:
+            print('proximity:', round(prox_mcts, 2))
+    if 'validity' in criteria_to_use:
+        val_mcts = validity_single_partial(org_mcts, cf_mcts)
+        qc_mcts += val_mcts * normalisation['validity'] * weight['validity']
+        if org_step:
+            val_step = validity_single_partial(org_step, cf_step)
+            val_random = validity_single_partial(org_random, cf_random)
+            print('validity:', round(val_mcts, 2), round(val_step, 2), round(val_random, 2))
+            qc_step += val_step * normalisation['validity'] * weight['validity']
+            qc_random += val_random * normalisation['validity'] * weight['validity']
+        else:
+            print('validity:', round(val_mcts, 2))
+    if 'sparsity' in criteria_to_use:
+        spar_mcts = sparsitiy_single_partial(org_mcts, cf_mcts)
+        qc_mcts += spar_mcts * normalisation['sparsity'] * weight['sparsity']
+        if org_step:
+            spar_step = sparsitiy_single_partial(org_step, cf_step)
+            spar_random = sparsitiy_single_partial(org_random, cf_random)
+            print('sparsity:', round(spar_mcts, 2), round(spar_step, 2), round(spar_random, 2))        
+            qc_step += spar_step * normalisation['sparsity'] * weight['sparsity']
+            qc_random += spar_random * normalisation['sparsity'] * weight['sparsity']
+        else:
+            print('sparsity:', round(spar_mcts, 2))
+    if 'realisticness' in criteria_to_use:
+        real_mcts = realisticness_single_partial(org_mcts, cf_mcts)
+        qc_mcts += real_mcts * normalisation['realisticness'] * weight['realisticness']
+        if org_step:
+            real_step = realisticness_single_partial(org_step, cf_step)
+            real_random = realisticness_single_partial(org_random, cf_random)
+            print('realisticness:', round(real_mcts, 2), round(real_step, 2), round(real_random, 2))
+            qc_step += real_step * normalisation['realisticness'] * weight['realisticness']
+            qc_random += real_random * normalisation['realisticness'] * weight['realisticness']
+        else:
+            print('realisticness:', round(real_mcts, 2))
+    if 'diversity' in criteria_to_use:
+        div_mcts = diversity_single(org_mcts, cf_mcts, start_mcts, prev_org_trajs, prev_cf_trajs, prev_starts)
+        qc_mcts += div_mcts * normalisation['diversity'] * weight['diversity']
+        if org_step:
+            div_step = diversity_single(org_step, cf_step, start_step, prev_org_trajs, prev_cf_trajs, prev_starts)
+            div_random = diversity_single(org_random, cf_random, start_random, prev_org_trajs, prev_cf_trajs, prev_starts)
+            print('diversity:', round(div_mcts, 2), round(div_step, 2), round(div_random, 2))
+            qc_step += div_step * normalisation['diversity'] * weight['diversity']
+            qc_random += div_random * normalisation['diversity'] * weight['diversity']
+        else:
+            print('diversity:', round(div_mcts, 2))
+    if 'critical_state' in criteria_to_use:
+        crit_mcts = critical_state_single(ppo, org_mcts['states'][0])
+        qc_mcts += crit_mcts * normalisation['critical_state'] * weight['critical_state']
+        if org_step:
+            crit_step = critical_state_single(ppo, org_step['states'][0])
+            crit_random = critical_state_single(ppo, org_random['states'][0])
+            print('critical_state:', round(crit_mcts, 2), round(crit_step, 2), round(crit_random, 2))
+            qc_step += crit_step * normalisation['critical_state'] * weight['critical_state']
+            qc_random += crit_random * normalisation['critical_state'] * weight['critical_state']
+        else:
+            print('critical_state:', round(crit_mcts, 2))
+
+    if org_step:
+        print('qc:', round(qc_mcts, 2), round(qc_step, 2), round(qc_random, 2))
+        with open("interpretability\logs\qc_comparison.txt", "a") as f:
+            print('proximity:', round(prox_mcts, 2), round(prox_step, 2), round(prox_random, 2), file=f)
+            print('validity:', round(val_mcts, 2), round(val_step, 2), round(val_random, 2), file=f)
+            print('sparsity:', round(spar_mcts, 2), round(spar_step, 2), round(spar_random, 2), file=f)
+            print('realisticness:', round(real_mcts, 2), round(real_step, 2), round(real_random, 2), file=f)
+            print('diversity:', round(div_mcts, 2), round(div_step, 2), round(div_random, 2), file=f)
+            print('critical_state:', round(crit_mcts, 2), round(crit_step, 2), round(crit_random, 2), file=f)
+            print('qc:', round(qc_mcts, 2), round(qc_step, 2), round(qc_random, 2), file=f)
+    else:
+        print('qc:', round(qc_mcts, 2))
+        with open("interpretability\logs\qc_comparison.txt", "a") as f:
+            print('proximity:', round(prox_mcts, 2), file=f)
+            print('validity:', round(val_mcts, 2), file=f)
+            print('sparsity:', round(spar_mcts, 2), file=f)
+            print('realisticness:', round(real_mcts, 2), file=f)
+            print('diversity:', round(div_mcts, 2), file=f)
+            print('critical_state:', round(crit_mcts, 2), file=f)
+            print('qc:', round(qc_mcts, 2), file=f)

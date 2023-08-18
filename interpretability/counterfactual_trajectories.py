@@ -15,11 +15,11 @@ import argparse
 import sys
 import tensorflow as tf
 from copy import *
-from helpers.visualize_trajectory import visualize_two_part_trajectories
+from helpers.visualize_trajectory import visualize_two_part_trajectories, visualize_two_part_trajectories_part
 from helpers.util_functions import *
 import random 
 import time
-from quality_metrics.quality_metrics import measure_quality, evaluate_qcs_for_cte
+from quality_metrics.quality_metrics import measure_quality, evaluate_qcs_for_cte, compare_cte_methods
 from quality_metrics.distance_measures import distance_all as distance_all
 import pickle
 from helpers.parsing import sort_args, parse_attributes
@@ -43,9 +43,9 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    base_path = '.\datasets\\1000\\'
+    base_path = '.\datasets\\100mcts\\'
     measure_statistics = True
-    num_runs = 1000
+    num_runs = 10
     criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
     # criteria = ['baseline']
     # criteria = ['validity']
@@ -107,6 +107,8 @@ def test_same_next_state(states_tensor, next_state, org_action, cf_action):
     return True
     
 def generate_counterfactual_random(org_traj, ppo, discriminator, seed_env):
+    long_enough = False
+    # while not long_enough:
     start = random.randint(0, len(org_traj['states'])-1)
 
     vec_env_cf = VecEnv(config.env_id, config.n_workers, seed=seed_env)
@@ -126,7 +128,8 @@ def generate_counterfactual_random(org_traj, ppo, discriminator, seed_env):
         action_distribution = ppo.action_distribution_torch(states_tensor)
         # remove all actions below the threshold
 
-        action_distribution = torch.cat((action_distribution, torch.tensor([0.2]).view(1,1)), 1)
+        if len(cf_traj['states']) > 1:
+            action_distribution = torch.cat((action_distribution, torch.tensor([0.2]).view(1,1)), 1)
         m = Categorical(action_distribution)
         action = m.sample()
         action = action.item()
@@ -136,6 +139,13 @@ def generate_counterfactual_random(org_traj, ppo, discriminator, seed_env):
         
 
     part_org_traj = partial_trajectory(org_traj, start, start + len(cf_traj['states']) - 1)
+        # if len(cf_traj['states']) > 1 and len(part_org_traj['states']) > 1:
+        #     long_enough = True
+        # else:
+        #     random.seed(time.time())
+        #     torch.seed(time.time())
+            
+
     return part_org_traj, cf_traj, start
 
 
@@ -302,22 +312,22 @@ if __name__ == '__main__':
 
         # generate the counterfactual trajectories
         if config.cf_method == 'mcts':
-            random_org, random_cf, random_start = generate_counterfactual_random(org_traj, ppo, discriminator, seed_env)
-            part_org, part_cf, chosen_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
-            
+            # Method 1: MCTS            
+            mcts_org, mcts_cf, mcts_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env)
             efficiency = time.time() - time_start
-            visualize_two_part_trajectories(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_cf,  chosen_end_org)
+            # visualize_two_part_trajectories_part(mcts_org, mcts_cf)
 
 
-            part_rewards = sum(part_org['rewards'])
-            all_part_orgs.append((part_org, part_rewards))
-            part_rewards_cf = sum(part_cf['rewards'])
-            all_part_cfs.append((part_cf, part_rewards_cf))
-        
+            mcts_rewards = sum(mcts_org['rewards'])
+            all_part_orgs.append((mcts_org, mcts_rewards))
+            mcts_rewards_cf = sum(mcts_cf['rewards'])
+            all_part_cfs.append((mcts_cf, mcts_rewards_cf))
+
+            # Method 2: 1-step deviation
             counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs = generate_counterfactuals(org_traj, ppo, discriminator, seed_env)
             if not baseline:
                 # use the quality criteria to determine the best counterfactual trajectory
-                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, config.criteria, part_org, part_cf, chosen_start, random_org, random_cf, random_start)
+                sort_index, qc_stats = measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, starts, end_cfs, end_orgs, ppo, all_org_trajs, all_cf_trajs, all_starts, config.criteria)
                 qc_statistics.append(qc_stats)
             else:
                 # use a random baseline to determine the best counterfactual trajectory
@@ -330,13 +340,20 @@ if __name__ == '__main__':
 
             efficiency = time.time() - time_start
 
-            part_org = partial_trajectory(org_traj, chosen_start, chosen_end_org)
-            part_rewards = sum(part_org['rewards'])
-            all_part_orgs.append((part_org, part_rewards))
+            step_org = partial_trajectory(org_traj, chosen_start, chosen_end_org)
+            step_rewards = sum(step_org['rewards'])
+            # all_part_orgs.append((step_org, step_rewards))
 
-            part_cf = partial_trajectory(chosen_counterfactual_trajectory, chosen_start, chosen_end_cf)
-            part_rewards_cf = sum(part_cf['rewards'])
-            all_part_cfs.append((part_cf, part_rewards_cf))
+            step_cf = partial_trajectory(chosen_counterfactual_trajectory, chosen_start, chosen_end_cf)
+            step_rewards_cf = sum(step_cf['rewards'])
+            # all_part_cfs.append((step_cf, step_rewards_cf))
+
+            # Method 3: Random
+            random_org, random_cf, random_start = generate_counterfactual_random(org_traj, ppo, discriminator, seed_env)
+
+            # Compare the methods
+            compare_cte_methods(mcts_org, mcts_cf, mcts_start, all_org_trajs, all_cf_trajs, all_starts, config.criteria, ppo, step_org, step_cf, chosen_start, random_org, random_cf, random_start)
+            # compare_cte_methods(mcts_org, mcts_cf, mcts_start, all_org_trajs, all_cf_trajs, all_starts, config.criteria, ppo)
 
         # uncomment below if the trajectories should be visualized:
         # visualize_two_part_trajectories(org_traj, chosen_counterfactual_trajectory, chosen_start, chosen_end_cf,  chosen_end_org)
@@ -345,17 +362,17 @@ if __name__ == '__main__':
 
         if config.measure_statistics:
             # record stastics
-            lengths_org.append(len(part_org['states']))
-            lengths_cf.append(len(part_cf['states']))
-            start_points.append(chosen_start)
-            chosen_val, chosen_prox, chosen_crit, chosen_dive, chosen_real, chosen_spar = evaluate_qcs_for_cte(part_org, part_cf, chosen_start, ppo, all_org_trajs, all_cf_trajs, all_starts)
+            lengths_org.append(len(mcts_org['states']))
+            lengths_cf.append(len(mcts_cf['states']))
+            start_points.append(mcts_start)
+            chosen_val, chosen_prox, chosen_crit, chosen_dive, chosen_real, chosen_spar = evaluate_qcs_for_cte(mcts_org, mcts_cf, mcts_start, ppo, all_org_trajs, all_cf_trajs, all_starts)
             quality_criteria.append((chosen_val, chosen_prox, chosen_crit, chosen_dive, chosen_real, chosen_spar))
             effiencies.append(efficiency)
 
         # add the original trajectory and the counterfactual trajectory to the list of all trajectories
-        all_org_trajs.append(part_org)
-        all_cf_trajs.append(part_cf)
-        all_starts.append(chosen_start)
+        all_org_trajs.append(mcts_org)
+        all_cf_trajs.append(mcts_cf)
+        all_starts.append(mcts_start)
 
 
     print('avg length org: ', np.mean(lengths_org))
