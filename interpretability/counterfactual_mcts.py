@@ -39,7 +39,7 @@ likelihood_terminal = 0.2
 discout_factor = 0.8
 terminal_state = (-1,-1)
 qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness']
-normalisation = {'proximity':1, 'sparsity':1/40, 'validity':1/5, 'realisticness':20}
+normalisation = {'proximity':0.5, 'sparsity':1/20, 'validity':1/4, 'realisticness':20, 'critical_state':2, 'diversity':1/8}
 timeout=5
 
 def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env):
@@ -65,7 +65,7 @@ def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env):
                 max_val = value
                 chosen_action = action
 
-        print("Depth:", i, "; Chosen action:", chosen_action, string)
+        # print("Depth:", i, "; Chosen action:", chosen_action, string)
         cf_trajectory.append(chosen_action)
         for (child, _) in root_node.children[chosen_action]:
             if cf_trajectory == child.trajectory['actions']:
@@ -340,7 +340,7 @@ class MCTS:
 
             current_time = time.time()
 
-        print("Number of iterations", iteration)
+        # print("Number of iterations", iteration)
         return root_node
     
     """ Choose a random action. Heustics can be used here to improve simulations. """
