@@ -89,7 +89,7 @@ def step_v2(state, action, num_step):
         
         next_state = next_state.unsqueeze(dim=0)
         # quit game?
-        if action == 9:
+        if action == 9 or num_step >= MAX_STEPS:
             return next_state, True, num_step
         return next_state, False, num_step
 

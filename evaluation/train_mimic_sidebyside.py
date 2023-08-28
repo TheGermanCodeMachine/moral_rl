@@ -27,14 +27,14 @@ class config:
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
     model_type = 'NN' # model_type = 'NN' or 'linear'
     data_folds = 5
-    results_path = "\\results_sidebysideLM\\" # Foldername to save results to
+    results_path = "\\results_sidebyside\\" # Foldername to save results to
     print_plot = False
     print_examples = False
     print_weights = False
     save_results = True
     print_worst_examples = False
     print_best_examples = False
-    save_model = False
+    save_model = True
 
 # randomises the order of trajectories, while keeping the pairs of original and counterfactual trajectories together
 # also makes them into tensors
@@ -183,6 +183,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
 
     if contrastive:
         train_set, train_labels, test_set, test_labels = train_test_split_contrastive_sidebyside(org_features, cf_features, num_features, n_train=n_train)
+        # epochs, learning_rate, regularisation, num_layers, hidden_sizes = 221, 0.3, 0.1, 4, [12,6]
         epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels)
     else:
         train_set, train_labels, test_set, test_labels = train_test_split(org_features, cf_features, num_features, train_ratio=0.6)
@@ -345,7 +346,7 @@ def hyper_param_optimization(train_set, train_labels):
     return best_epoch, best_lr, best_l2, best_num_layers, best_hidden_layer_sizes
 
 if __name__ == '__main__':
-    folder_path = 'datasets\\100mcts\\100'
+    folder_path = 'datasets\\100random\\100'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:

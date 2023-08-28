@@ -463,7 +463,7 @@ def experiment_over_all_folders():
         print('\n')
 
 def experiment_for_single_folder():
-    folder_path = 'datasets\\100mcts\\10'
+    folder_path = 'datasets\\100mcts\\100'
 
     # if there is an argument in the console
     if len(sys.argv) > 1:

@@ -3,7 +3,7 @@ from pathlib import Path
 adjacent_folder = Path(__file__).parent.parent
 sys.path.append(str(adjacent_folder))
 import pickle
-import reward_features as erf
+import evaluation.reward_features as erf
 import random
 import numpy as np
 from copy import deepcopy
@@ -12,6 +12,20 @@ from helpers.folder_util_functions import iterate_through_folder, write, read
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
+def extract_features_not_normalised(trajectories):
+    all_features, citizens_saveds, unsaved_citizenss, distance_to_citizens, standing_on_extinguishers, lengths, could_have_saveds, final_number_of_unsaved_citizenss, moved_towards_closest_citizens = [], [], [], [], [], [], [], [], []
+    for traj in trajectories:
+        citizens_saveds.append(erf.citizens_saved(traj))
+        # citizens_missed.append(erf.citizens_missed(cf_traj))
+        unsaved_citizenss.append(erf.unsaved_citizens(traj))
+        distance_to_citizens.append(erf.distance_to_citizen(traj))
+        standing_on_extinguishers.append(erf.standing_on_extinguisher(traj))
+        lengths.append(erf.length(traj))
+        could_have_saveds.append(erf.could_have_saved(traj))
+        final_number_of_unsaved_citizenss.append(erf.final_number_of_unsaved_citizens(traj))
+        moved_towards_closest_citizens.append(erf.moved_towards_closest_citizen(traj))
+    all_features = [list(a) for a in zip(citizens_saveds, unsaved_citizenss, distance_to_citizens, standing_on_extinguishers, lengths, could_have_saveds, final_number_of_unsaved_citizenss, moved_towards_closest_citizens)]
+    return all_features
 
 def extract_features(trajectories):
     all_features, citizens_saveds, unsaved_citizenss, distance_to_citizens, standing_on_extinguishers, lengths, could_have_saveds, final_number_of_unsaved_citizenss, moved_towards_closest_citizens = [], [], [], [], [], [], [], [], []

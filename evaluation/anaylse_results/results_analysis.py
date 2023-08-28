@@ -119,7 +119,7 @@ def get_statistics(data):
     output = {'efficiencies': efficiencies, 'lengths_cf': lengths_cf, 'lengths_org': lengths_org, 'quality_criteria': quality_criteria, 'start_points': start_points, 'org_feature_stats': org_feature_stats, 'cf_feature_stats': cf_feature_stats, 'qc_statistics': qc_statistics}
     return output
 
-base_path = "datasets\\1000"
+base_path = "datasets\\100mcts"
 
 model_type = 'LM' # 'LM' or 'NN2'
 
@@ -130,11 +130,11 @@ results, results_ood, weights, statistics, feature_states = [], [], [], [], []
 
 # iterate through all the folders
 # for folder in os.listdir(base_path):
-folder = 'baseline'
+folder = '100'
 # if folder == 'description.txt' or folder == "baseline1":
 #     continue   
 # go into the results folder
-results_path = os.path.join(base_path, folder, "results_sidebyside")
+results_path = os.path.join(base_path, folder, "results_sidebyside\80")
 statistics_path = os.path.join(base_path, folder, "statistics")
 # get the name of the folder
 folder_name = os.path.basename(folder)

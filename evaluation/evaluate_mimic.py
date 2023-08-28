@@ -53,3 +53,17 @@ def evaluate_mimic(model, test, labels, print_it=False, worst=False, best=False,
         
         return test_loss, test_mean_error, rmse, r2, pearson_correlation, spearman_correlation, pred_label_pairs
     
+def evaluate_random(random_generator, test, labels):
+    loss = torch.nn.MSELoss()
+    with torch.no_grad():
+        y_pred = torch.tensor(random_generator.sample(test.shape[0]))
+        # record multiple loss metrics
+        test_loss = loss(y_pred, labels).item()
+        pred_label_pairs = list(zip(y_pred, labels))
+        test_mean_error = torch.mean(torch.abs(y_pred - labels)).item()
+        rmse = sqrt(test_loss)
+        r2 = r2_score(labels, y_pred)
+        pearson_correlation = pearsonr(y_pred, labels)[0]
+        spearman_correlation = spearmanr(y_pred, labels)[0]
+        
+        return test_loss, test_mean_error, rmse, r2, pearson_correlation, spearman_correlation, pred_label_pairs
