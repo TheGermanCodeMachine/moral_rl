@@ -47,7 +47,7 @@ class config:
     max_steps = 75
     base_path = '.\datasets\\100mcts\\'
     measure_statistics = True
-    num_runs = 10
+    num_runs = 100
     criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
     # criteria = ['baseline']
     # criteria = ['validity']
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     # load the original trajectories
     org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_1000.pkl', 'rb'))
 
-    normalising_qcs(ppo, discriminator, org_traj_seed, config)
+    # normalising_qcs(ppo, discriminator, org_traj_seed, config)
 
     # stop after the number of runs config.num_runs or iterate through all original trajectories
     run = 0
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         # generate the counterfactual trajectories
         if config.cf_method == 'mcts':
             # Method 1: MCTS            
-            mcts_org, mcts_cf, mcts_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, all_org_trajs, all_cf_trajs, all_starts)
+            mcts_org, mcts_cf, mcts_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, all_org_trajs, all_cf_trajs, all_starts, config)
             efficiency = time.time() - time_start
             # visualize_two_part_trajectories_part(mcts_org, mcts_cf)
 

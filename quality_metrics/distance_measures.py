@@ -42,6 +42,8 @@ def distance_subtrajectories(traj1, traj2):
         for j in range(len(traj2['states'])-1):
             dist_table[i,j] = state_action_diff(traj1['states'][i+1], traj1['actions'][i], traj2['states'][j+1], traj2['actions'][j])
 
+    if dist_table.shape[0] == 0 or dist_table.shape[1] == 0:
+        a=0
     dist_A_B = np.mean(np.min(dist_table, axis=1))
     dist_B_A = np.mean(np.min(dist_table, axis=0))
     # deviation = 0.05*len((traj1['states'])) + 0.05*len((traj2['states']))

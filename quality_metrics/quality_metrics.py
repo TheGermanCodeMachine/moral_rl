@@ -20,9 +20,11 @@ from quality_metrics.sparsity_measure import sparsity_all as sparsity
 from quality_metrics.sparsity_measure import sparsitiy_single_partial
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
-from interpretability.normalising_qc import normalisation
+import pickle
 
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
+with open('interpretability\\normalisation_values.pkl', 'rb') as f:
+    normalisation = pickle.load(f)
 
 def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_trajs, all_cf_trajs, all_starts):
     best_val = validity_single_partial(org_traj, counterfactual_traj)

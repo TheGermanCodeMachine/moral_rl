@@ -27,7 +27,6 @@ import pickle
 from helpers.parsing import sort_args, parse_attributes
 from collections import defaultdict
 from helpers.util_functions import extract_player_position
-from counterfactual_trajectories import config, retrace_original
 from moral.ppo import PPO
 from torch.distributions import Categorical
 from helpers.util_functions import partial_trajectory
@@ -40,11 +39,11 @@ likelihood_terminal = 0.2
 discout_factor = 0.8
 terminal_state = (-1,-1)
 qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness']
-timeout=0.1
+timeout=3
 
-def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts):
+def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts, config):
     
-    critical_states = critical_state(ppo, org_traj['states'])
+    critical_states = critical_state(ppo, org_traj['states'][:-1])
     # get the index of the 5 states with the highest critical state
     critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
     critical_states.sort(key=lambda x: x[0], reverse=True)
@@ -52,7 +51,7 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_or
 
     part_orgs, part_cfs, q_values, divs = [], [], [], []
     for (i, starting_position) in critical_states:
-        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env)
+        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, config)
         part_orgs.append(part_org)
         part_cfs.append(part_cf)
         q_values.append(q_value)
@@ -66,17 +65,17 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_or
     chosen_start = critical_states[sort_index][1]
     return chosen_part_org, chosen_part_cf, chosen_start
 
-def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env):
+def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, config):
     chosen_action = -1
     done = False
     root_node = None
     cf_trajectory = []
     qfunction = QTable()
-    num_step = starting_position
+    num_step = starting_position+1
 
     i = 0
-    while chosen_action!=9 and num_step < MAX_STEPS:
-        mdp = MDP(discriminator, ppo, num_step, org_traj)
+    while chosen_action!=9 and num_step < MAX_STEPS-1:
+        mdp = MDP(discriminator, ppo, starting_position, org_traj)
         root_node = MCTS(mdp, qfunction, UpperConfidenceBounds(), ppo, num_step).mcts(timeout=timeout, root_node=root_node)
 
         # choose the child node with the highest q value
@@ -100,7 +99,8 @@ def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env):
         # cf_trajectory.append(action)
         # (next_state, reward, done) = mdp.execute(action)
 
-    cf_trajectory.remove(9)
+    if 9 in cf_trajectory:
+        cf_trajectory.remove(9)
 
     full_trajectory = {'states': [], 'actions': [], 'rewards': []}
     vec_env = VecEnv(config.env_id, config.n_workers, seed=seed_env)
@@ -160,11 +160,15 @@ class MDP():
             reward = 0
         if done:
             reward = self.get_reward(trajectory)
+            if len(trajectory['states']) <= 2:
+                a=0
         return trajectory, reward, done, num_step
 
         
     def get_reward(self, trajectory):
-        org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(trajectory)-1+self.starting_step)
+        org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(trajectory['states'])-1+self.starting_step)
+        if len(org_traj['states']) != len(trajectory['states']):
+            a=0
         return evaluate_qc(org_traj, trajectory, qc_criteria_to_use)
     
 
@@ -192,7 +196,7 @@ class MDP():
 
     def is_terminal(self, traj, num_step):
         if len(traj) >= 1:
-            return traj[-1]==9 or num_step >= MAX_STEPS
+            return traj[-1]==9 or num_step >= MAX_STEPS-2
         return False
     
 
@@ -324,7 +328,7 @@ class Node():
         # This outcome has not occured from this state-action pair previously
         next_state = traj['states'][-1].clone().detach()
         new_child = Node(
-            self.mdp, self, next_state, traj, self.qfunction, self.bandit, self.num_step+1, action=action
+            self.mdp, self, next_state, traj, self.qfunction, self.bandit, n_step, action=action
         )
 
         # Find the probability of this outcome (only possible for model-based) for visualising tree
@@ -368,14 +372,15 @@ class MCTS:
         return root_node
     
     """ Choose a random action. Heustics can be used here to improve simulations. """
-    def choose(self, state):
+    def choose(self, state, num_steps):
         action_distribution = self.ppo.action_distribution_torch(state)
         # remove all actions below the threshold
         for i in range(action_distribution.shape[1]):
             if action_distribution[0][i] < action_threshold:
                 action_distribution[0][i] = 0
 
-        action_distribution = torch.cat((action_distribution, torch.tensor([likelihood_terminal]).view(1,1)), 1)
+        if num_steps > 0:
+            action_distribution = torch.cat((action_distribution, torch.tensor([likelihood_terminal]).view(1,1)), 1)
         m = Categorical(action_distribution)
         action = m.sample()
         return action.item()
@@ -390,12 +395,14 @@ class MCTS:
         cumulative_reward = 0.0
         depth = 0
         done = False
-        if node.action==9 or num_step >= MAX_STEPS:
+        if node.action==9 or num_step >= MAX_STEPS -2:
             cumulative_reward = self.mdp.get_reward(trajectory)
         while not self.mdp.is_terminal(trajectory['actions'], num_step) and not done:
             # Choose an action to execute
-            action = self.choose(state)
+            action = self.choose(state, len(trajectory['actions']))
 
+            if len(trajectory['states'])-1+self.mdp.starting_step >= 73:
+                a=0
             # Execute the action
             (trajectory, reward, done, num_step) = self.mdp.execute(trajectory, action, num_step)
 

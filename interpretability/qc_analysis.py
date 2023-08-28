@@ -4,7 +4,11 @@ adjacent_folder = Path(__file__).parent.parent
 sys.path.append(str(adjacent_folder))
 
 import numpy as np
-from quality_metrics.quality_metrics import normalisation, weight
+from quality_metrics.quality_metrics import weight
+import pickle
+
+with open('interpretability\\normalisation_values.pkl', 'rb') as f:
+    normalisation = pickle.load(f)
 
 mcts_prox, step_prox, random_prox = [], [], []
 mcts_val, step_val, random_val = [], [], []
@@ -18,35 +22,35 @@ with open('interpretability\logs\qc_comparison.txt', 'r') as f:
     for line in f:
         parts = line.split(' ')
         if 'validity' in line:
-            mcts_val.append(float(parts[1]) * normalisation['validity'] * weight['validity'])
+            mcts_val.append(float(parts[1]) / normalisation['validity'] * weight['validity'])
             if len(parts) > 2:
-                step_val.append(float(parts[2]) * normalisation['validity'] * weight['validity'])
-                random_val.append(float(parts[3]) * normalisation['validity'] * weight['validity'])
+                step_val.append(float(parts[2]) / normalisation['validity'] * weight['validity'])
+                random_val.append(float(parts[3]) / normalisation['validity'] * weight['validity'])
         elif 'diversity' in line:
-            mcts_div.append(float(parts[1]) * normalisation['diversity'] * weight['diversity'])
+            mcts_div.append(float(parts[1]) / normalisation['diversity'] * weight['diversity'])
             if len(parts) > 2:
-                step_div.append(float(parts[2]) * normalisation['diversity'] * weight['diversity'])
-                random_div.append(float(parts[3]) * normalisation['diversity'] * weight['diversity'])
+                step_div.append(float(parts[2]) / normalisation['diversity'] * weight['diversity'])
+                random_div.append(float(parts[3]) / normalisation['diversity'] * weight['diversity'])
         elif 'proximity' in line:
-            mcts_prox.append(- float(parts[1]) * normalisation['proximity'] * weight['proximity'])
+            mcts_prox.append(- float(parts[1]) / normalisation['proximity'] * weight['proximity'])
             if len(parts) > 2:
-                step_prox.append(-float(parts[2]) * normalisation['proximity'] * weight['proximity'])
-                random_prox.append(-float(parts[3]) * normalisation['proximity'] * weight['proximity'])
+                step_prox.append(-float(parts[2]) / normalisation['proximity'] * weight['proximity'])
+                random_prox.append(-float(parts[3]) / normalisation['proximity'] * weight['proximity'])
         elif 'critical' in line:
-            mcts_crit.append(float(parts[1]) * normalisation['critical_state'] * weight['critical_state'])
+            mcts_crit.append(float(parts[1]) / normalisation['critical_state'] * weight['critical_state'])
             if len(parts) > 2:
-                step_crit.append(float(parts[2]) * normalisation['critical_state'] * weight['critical_state'])
-                random_crit.append(float(parts[3]) * normalisation['critical_state'] * weight['critical_state'])
+                step_crit.append(float(parts[2]) / normalisation['critical_state'] * weight['critical_state'])
+                random_crit.append(float(parts[3]) / normalisation['critical_state'] * weight['critical_state'])
         elif 'realistic' in line:
-            mcts_real.append(float(parts[1])   * normalisation['realisticness'] * weight['realisticness'])
+            mcts_real.append(float(parts[1])   / normalisation['realisticness'] * weight['realisticness'])
             if len(parts) > 2:
-                step_real.append(float(parts[2])   * normalisation['realisticness'] * weight['realisticness'])
-                random_real.append(float(parts[3]) * normalisation['realisticness'] * weight['realisticness'])
+                step_real.append(float(parts[2])   / normalisation['realisticness'] * weight['realisticness'])
+                random_real.append(float(parts[3]) / normalisation['realisticness'] * weight['realisticness'])
         elif 'sparsity' in line:
-            mcts_spar.append(float(parts[1]) * normalisation['sparsity'] * weight['sparsity'])
+            mcts_spar.append(float(parts[1]) / normalisation['sparsity'] * weight['sparsity'])
             if len(parts) > 2:
-                step_spar.append(float(parts[2]) * normalisation['sparsity'] * weight['sparsity'])
-                random_spar.append(float(parts[3]) * normalisation['sparsity'] * weight['sparsity'])
+                step_spar.append(float(parts[2]) / normalisation['sparsity'] * weight['sparsity'])
+                random_spar.append(float(parts[3]) / normalisation['sparsity'] * weight['sparsity'])
         elif 'qc' in line:
             mcts_qc.append(float(parts[1]))
             if len(parts) > 2:
@@ -76,4 +80,5 @@ with open('interpretability\logs\qc_comparison.txt', 'r') as f:
         print('Critical', round(np.mean(mcts_crit),2), -0.07, -0.15)
         print('Realistic', round(np.mean(mcts_real),2), 0.81, 0.16)
         print('Sparsity', round(np.mean(mcts_real),2), -0.24, -0.19)
+
         print('QC', round(np.mean(mcts_qc),2), 1.74, 0.69)
