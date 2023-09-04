@@ -1,7 +1,7 @@
 import sys
 import os
 from pathlib import Path
-adjacent_folder = Path(__file__).parent.parent
+adjacent_folder = Path(__file__).parent.parent.parent
 sys.path.append(str(adjacent_folder))
 from tqdm import tqdm
 from moral.ppo import PPO, TrajectoryDataset, update_policy
@@ -23,9 +23,9 @@ from quality_metrics.quality_metrics import measure_quality, evaluate_qcs_for_ct
 from quality_metrics.distance_measures import distance_all as distance_all
 import pickle
 from helpers.parsing import sort_args, parse_attributes
-from generation_methods.counterfactual_mcts import *
-from generation_methods.counterfactual_step import *
-from generation_methods.counterfactual_random import *
+from interpretability.generation_methods.counterfactual_mcts import *
+from interpretability.generation_methods.counterfactual_step import *
+from interpretability.generation_methods.counterfactual_random import *
 from quality_metrics.critical_state_measures import critical_state_all as critical_state
 from normalising_qc import normalising_qcs
 
@@ -45,9 +45,9 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    base_path = '.\datasets\\100mcts\\'
+    base_path = '.\datasets\\10000random\\'
     measure_statistics = True
-    num_runs = 100
+    num_runs = 1000
     criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
     # criteria = ['baseline']
     # criteria = ['validity']
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     print('Criteria: ', config.criteria, baseline)
     
     # make a random number based on the time
-    random.seed(4)
+    random.seed(7)
     seed_env = random.randint(0, 100000)
     torch.manual_seed(seed_env)
     np.random.seed(seed_env)
@@ -92,15 +92,15 @@ if __name__ == '__main__':
     print('Initializing and Normalizing Rewards...')
     ppo = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
     optimizer = torch.optim.Adam(ppo.parameters(), lr=config.lr_ppo)
-    ppo.load_state_dict(torch.load('saved_models/ppo_airl_v2_[1,10].pt', map_location=torch.device('cpu')))
+    ppo.load_state_dict(torch.load('saved_models/ppo_airl_v2_[1,10]_new.pt', map_location=torch.device('cpu')))
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
-    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
+    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10]_new.pt', map_location=torch.device('cpu')))
 
     all_org_trajs, all_cf_trajs, all_starts, all_end_orgs, all_end_cfs, all_part_orgs, all_part_cfs, random_baseline_cfs, random_baseline_orgs = [], [], [], [], [], [], [], [], []
     lengths_org, lengths_cf, start_points, quality_criteria, effiencies, qc_statistics = [], [], [], [], [], []
 
     # load the original trajectories
-    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_1000.pkl', 'rb'))
+    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_1000_new.pkl', 'rb'))
 
     run = 0
     for org_traj, seed_env in org_traj_seed:
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
 
     #save the trajectories
-    with open('datasets\\100random\\100' + '\org_trajectories.pkl', 'wb') as f:
+    with open('datasets\\10000random\\10000' + '\org_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_orgs, f)
-    with open('datasets\\100random\\100' + '\cf_trajectories.pkl', 'wb') as f:
+    with open('datasets\\10000random\\10000' + '\cf_trajectories.pkl', 'wb') as f:
         pickle.dump(all_part_cfs, f)

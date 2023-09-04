@@ -29,7 +29,8 @@ class config:
     
 if __name__ == '__main__':
     # Load demonstrations
-    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_75_[1,10].pk', 'rb'))
+    expert_trajectories = pickle.load(open('demonstrations/ppo_demos_v2_75_[1,10]_1000.pk', 'rb'))
+    print(len(expert_trajectories))
 
 
 
@@ -61,7 +62,9 @@ if __name__ == '__main__':
 
     # Initialize Models
     ppo = PPO(state_shape=state_shape, n_actions=n_actions, in_channels=in_channels).to(device)
+    ppo.load_state_dict(torch.load('saved_models\\tmp\ppo_airl_v2_[1, 10]tmp_240000.pt', map_location=torch.device('cpu')))
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
+    discriminator.load_state_dict(torch.load('saved_models\\tmp\discriminator_v2_[1, 10]tmp_240000.pt', map_location=torch.device('cpu')))
     optimizer = torch.optim.Adam(ppo.parameters(), lr=5e-4)
     optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=5e-4)
     dataset = TrajectoryDataset(batch_size=config.batchsize_ppo, n_workers=config.n_workers)
@@ -71,7 +74,7 @@ if __name__ == '__main__':
     true_returns = []
 
 
-    for t in tqdm(range((int(config.env_steps/config.n_workers)))):
+    for t in tqdm(range(240000, (int(config.env_steps/config.n_workers)))):
         # at every 10% of the training process save a copy of the model
         # if t % (int(config.env_steps/config.n_workers)/10) == 0:
         #     torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[0,1].pt')
@@ -131,10 +134,10 @@ if __name__ == '__main__':
         # Prepare state input for next time step
         states = next_states.copy()
         states_tensor = torch.tensor(states).float().to(device)
-        if t % 10000 == 0:
+        if t % 5000 == 0:
             torch.save(discriminator.state_dict(), 'saved_models/tmp/discriminator_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
             torch.save(ppo.state_dict(), 'saved_models/tmp/ppo_airl_v2_' + str(config.lambd) + 'tmp_' + str(t) + '.pt')
 
     vec_env.close()
-    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[1,10].pt')
-    torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[1,10].pt')
+    torch.save(discriminator.state_dict(), 'saved_models/discriminator_v2_[1,10]_new.pt')
+    torch.save(ppo.state_dict(), 'saved_models/ppo_airl_v2_[1,10]_new.pt')

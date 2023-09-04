@@ -38,8 +38,9 @@ action_threshold = 0.05
 likelihood_terminal = 0.2
 discout_factor = 0.8
 terminal_state = (-1,-1)
-qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness']
-timeout=3
+qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness', 'diversity'
+                      ]
+timeout=5
 
 def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts, config):
     
@@ -49,23 +50,21 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_or
     critical_states.sort(key=lambda x: x[0], reverse=True)
     critical_states = critical_states[:5]
 
-    part_orgs, part_cfs, q_values, divs = [], [], [], []
+    part_orgs, part_cfs, q_values = [], [], []
     for (i, starting_position) in critical_states:
-        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, config)
+        part_org, part_cf, q_value = run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts, config)
         part_orgs.append(part_org)
         part_cfs.append(part_cf)
         q_values.append(q_value)
-        divs.append(diversity_single(part_org, part_cf, starting_position, prev_org_trajs, prev_cf_trajs, prev_starts))
-
 
     # select the best counterfactual trajectory
-    sort_index = np.argmax(divs)
+    sort_index = np.argmax(q_values)
     chosen_part_org = part_orgs[sort_index]
     chosen_part_cf = part_cfs[sort_index]
     chosen_start = critical_states[sort_index][1]
     return chosen_part_org, chosen_part_cf, chosen_start
 
-def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, config):
+def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts, config):
     chosen_action = -1
     done = False
     root_node = None
@@ -75,7 +74,7 @@ def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, con
 
     i = 0
     while chosen_action!=9 and num_step < MAX_STEPS-1:
-        mdp = MDP(discriminator, ppo, starting_position, org_traj)
+        mdp = MDP(discriminator, ppo, starting_position, org_traj, prev_org_trajs, prev_cf_trajs, prev_starts)
         root_node = MCTS(mdp, qfunction, UpperConfidenceBounds(), ppo, num_step).mcts(timeout=timeout, root_node=root_node)
 
         # choose the child node with the highest q value
@@ -141,11 +140,14 @@ def normalise_qc_values():
 
 class MDP():
 
-    def __init__(self, discriminator, ppo, starting_step, original_trajectory):
+    def __init__(self, discriminator, ppo, starting_step, original_trajectory, prev_org_trajs, prev_cf_trajs, prev_starts):
         self.discriminator = discriminator
         self.ppo = ppo
         self.starting_step = starting_step
         self.original_trajectory = original_trajectory
+        self.prev_org_trajs = prev_org_trajs
+        self.prev_cf_trajs = prev_cf_trajs
+        self.prev_starts = prev_starts
 
     def execute(self, trajectory, action, num_step):
         state = trajectory['states'][-1]
@@ -169,7 +171,7 @@ class MDP():
         org_traj = partial_trajectory(self.original_trajectory, self.starting_step, len(trajectory['states'])-1+self.starting_step)
         if len(org_traj['states']) != len(trajectory['states']):
             a=0
-        return evaluate_qc(org_traj, trajectory, qc_criteria_to_use)
+        return evaluate_qc(org_traj, trajectory, self.starting_step, qc_criteria_to_use, self.prev_org_trajs, self.prev_cf_trajs, self.prev_starts)
     
 
     def get_actions(self, state, traj_length):

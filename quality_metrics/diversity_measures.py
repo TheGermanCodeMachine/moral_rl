@@ -6,7 +6,7 @@ sys.path.append(str(adjacent_folder))
 import numpy as np
 import torch
 import random
-from helpers.util_functions import extract_player_position, normalise_values, partial_trajectory
+from helpers.util_functions import extract_player_position, normalise_features, partial_trajectory
 from quality_metrics.distance_measures import distance_subtrajectories, state_action_diff
 
 # global variable to store the rotated trajectories (so they don't have to be recalculated every time)

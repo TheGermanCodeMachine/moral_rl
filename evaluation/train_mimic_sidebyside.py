@@ -13,21 +13,37 @@ import random
 from helpers.folder_util_functions import iterate_through_folder, save_results, read, write
 from copy import deepcopy
 from utils_evaluation import *
+from mlxtend.feature_selection import SequentialFeatureSelector as SFS
+from stepwise_linear_model import train_step_wise_linear_model
 
 class hyperparameters:
     learning_rate = 1e-1
     regularisation = 1e-2
     l1_lambda = 1e-1
     epochs_non_contrastive = 10000
-    epochs_contrastive = 1000
-    number_of_seeds = 10
+    epochs_contrastive = 10000
+    number_of_seeds = 30
+
+class LM_params:
+    learning_rate = 0.1
+    regularisation = 0.001
+
+class NN_params:
+    # learning_rate = 0.01
+    # regularisation = 0.01
+    # num_layers = 4
+    # hidden_layer_sizes = [8,4]
+    learning_rate = 0.01
+    regularisation = 0.001
+    num_layers = 3
+    hidden_layer_sizes = [40]
     
     
 class config:    
     features = ['citizens_saved', 'unsaved_citizens', 'distance_to_citizen', 'standing_on_extinguisher', 'length', 'could_have_saved', 'final_number_of_unsaved_citizens', 'moved_towards_closest_citizen', 'bias']
-    model_type = 'NN' # model_type = 'NN' or 'linear'
+    model_type = 'NN' # model_type = 'NN' or 'linear' or 'stepwise'
     data_folds = 5
-    results_path = "\\results_sidebyside\\" # Foldername to save results to
+    results_path = "\\results_sidebyside_NN_many\\" # Foldername to save res  ults to
     print_plot = False
     print_examples = False
     print_weights = False
@@ -108,15 +124,14 @@ def train_model(train_set, train_labels, test_set, test_labels, num_features, ep
     # Initialise the model (either NN or LM)
     if config.model_type=='NN':
         # make a list of the layer dimensions: num_features, hidden_layer_sizes, 1
-        layer_dims = [num_features] + hidden_layer_sizes + [1]
 
         # Initialise the neural network with the number of layers and the hidden_sizes
         model = torch.nn.Sequential()
-        if num_layers:
-            model.add_module('linear' + str(0), torch.nn.Linear(layer_dims[0], layer_dims[1]))
-            for i in range(1, num_layers-1):
-                model.add_module('relu' + str(i), torch.nn.ReLU())
-                model.add_module('linear' + str(i), torch.nn.Linear(layer_dims[i], layer_dims[i+1]))
+        model.add_module('linear' + str(0), torch.nn.Linear(num_features, 8))
+        model.add_module('relu' + str(0), torch.nn.ReLU())
+        model.add_module('linear' + str(1), torch.nn.Linear(8, 4))
+        model.add_module('relu' + str(1), torch.nn.ReLU())
+        model.add_module('linear' + str(2), torch.nn.Linear(4, 1))
 
     elif config.model_type=='linear':
         model = torch.nn.Linear(num_features, 1)
@@ -135,6 +150,11 @@ def train_model(train_set, train_labels, test_set, test_labels, num_features, ep
 
         # Forward pass: compute predicted y by passing x to the model.
         y_pred = model(train_set).squeeze()
+        
+        # check if all model predictions are the same
+        if torch.all(torch.eq(y_pred, y_pred[0])):
+            print('all predictions are the same')
+
         # Compute and print loss.
         loss = loss_fn(y_pred, train_labels)
         train_losses.append(loss.item())
@@ -166,9 +186,6 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
     num_features = len(org_features[0])-1
     results_path = base_path + config.results_path + str(n_train) + "\\"
 
-    num_layers = None
-    hidden_sizes = None
-
     test_lossess, train_lossess, all_train_losses, test_mean_errors, test_rmses, test_r2s, train_mean_errors, train_rmses, pearson_correlations, spearman_correlations, weights, all_test_losses, epochss, learning_rates, regularisations = [], [], [], [], [], [], [], [], [], [], [], [], [], [], []
     test_loss_oods, test_mean_error_oods, test_rmse_oods, r2_oods, pearson_correlation_oods, spearman_correlation_oods, pred_label_pairs_oods = [], [], [], [], [], [], []
 
@@ -177,20 +194,31 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
     path = base_path.split('\\')
     path = '\\'.join(path[:-1])
     # load the data
-    org_features_ood = read(path + '\\baseline\org_features.pkl')
-    cf_features_ood = read(path + '\\baseline\cf_features.pkl')
+    org_features_ood = read(path + '\\baseline\org_features_new.pkl')
+    cf_features_ood = read(path + '\\baseline\cf_features_new.pkl')
     test_set_ood, test_labels_ood, _ , _ = train_test_split_contrastive_sidebyside(org_features_ood, cf_features_ood, num_features, n_train=len(org_features_ood))
 
-    if contrastive:
-        train_set, train_labels, test_set, test_labels = train_test_split_contrastive_sidebyside(org_features, cf_features, num_features, n_train=n_train)
-        # epochs, learning_rate, regularisation, num_layers, hidden_sizes = 221, 0.3, 0.1, 4, [12,6]
-        epochs, learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization(train_set, train_labels)
+    train_set, train_labels, test_set, test_labels = train_test_split_contrastive_sidebyside(org_features, cf_features, num_features, n_train=n_train)
+    # epochs, learning_rate, regularisation, num_layers, hidden_sizes = 221, 0.3, 0.1, 4, [12,6]
+    if config.model_type == 'NN':
+        learning_rate, regularisation, num_layers, hidden_sizes = NN_params.learning_rate, NN_params.regularisation, NN_params.num_layers, NN_params.hidden_layer_sizes
+        # learning_rate, regularisation, num_layers, hidden_sizes = hyper_param_optimization_architecture(train_set, train_labels)
+        print(learning_rate, regularisation, num_layers, hidden_sizes)
+    elif config.model_type == 'stepwise':
+        train_step_wise_linear_model(train_set, train_labels)
+        a = 1/0
     else:
-        train_set, train_labels, test_set, test_labels = train_test_split(org_features, cf_features, num_features, train_ratio=0.6)
+        learning_rate, regularisation = LM_params.learning_rate, LM_params.regularisation
+    epochs = tune_epochs(train_set, train_labels, learning_rate, regularisation)
+    # epochs = 4646
+
+    # save the split of the data
+    with open(results_path + 'data_split.pkl', 'wb') as f:
+        pickle.dump([train_set, train_labels, test_set, test_labels], f)
 
     for repeat in range(hyperparameters.number_of_seeds):
         # train the model (works for both, the linear and NN model)
-        model, full_train_losses, full_test_losses, train_losses, test_losses = train_model(train_set, train_labels, test_set, test_labels, num_features*2, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation, num_layers=num_layers, hidden_layer_sizes=hidden_sizes)
+        model, full_train_losses, full_test_losses, train_losses, test_losses = train_model(train_set, train_labels, test_set, test_labels, num_features*2, epochs=hyperparameters.epochs_contrastive, stop_epoch=epochs, learning_rate=learning_rate, regularisation=regularisation)
 
         # here we test on the left out test set
         test_loss, test_mean_error, test_rmse, r2, pearson_correlation, spearman_correlation, pred_label_pairs = evaluate_mimic(model, test_set, test_labels, worst=config.print_worst_examples, best=config.print_best_examples, features=config.features)
@@ -258,7 +286,7 @@ def learning_repeats(path_org, path_cf, base_path, contrastive=True, baseline=0,
 
         save_results(to_save, results_path, baseline, type='results', data_mixture=(0,0), con=True)
 
-        hyper_params = {'epochs': epochs, 'learning_rate': learning_rate, 'l2_regularisation': regularisation, "num_layers": num_layers, "hidden_sizes": hidden_sizes}
+        hyper_params = {'epochs': epochs, 'learning_rate': learning_rate, 'l2_regularisation': regularisation}
         save_results(hyper_params, results_path, baseline, type='hyper_params', data_mixture=(0,0))
 
         to_save = {'test_losses': test_loss_oods, 'test_mean_errors': test_mean_error_oods, 'test_rmses': test_rmse_oods, 'pearson_correlations': pearson_correlation_oods, 'spearman_correlations': spearman_correlation_oods, 'pred_label_pairs': pred_label_pairs_oods, 'r2s': r2_oods}
@@ -283,7 +311,25 @@ def cross_validate(train_set_folds, train_labels_folds, k):
     validation_labels_f = train_labels_folds[k]
     return train_set_f, train_labels_f, validation_set_f, validation_labels_f
 
-def hyper_param_optimization(train_set, train_labels):
+def tune_epochs(train_set, train_labels, lr, l2):
+    data_folds = config.data_folds
+    train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
+    test_lossess = []
+    num_features = num_features = len(train_set[0])
+
+    for k in range(data_folds):
+        train_set_f, train_labels_f, validation_set_f, validation_labels_f = cross_validate(train_set_folds, train_labels_folds, k)
+        model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features, epochs = hyperparameters.epochs_contrastive, learning_rate=lr, regularisation=l2)
+        test_lossess.append(test_losses)
+    
+    avg_test_losses = np.mean(test_lossess, axis=0)
+    # get minimum value and index
+    min_test_loss = np.amin(avg_test_losses)
+    min_index = np.argmin(avg_test_losses)
+    print(min_test_loss, min_index)
+    return min_index
+
+def hyper_param_optimization_architecture(train_set, train_labels):
     # we use 5-fold cross validation to find the best hyper parameters
     data_folds = config.data_folds
     train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
@@ -298,15 +344,13 @@ def hyper_param_optimization(train_set, train_labels):
 
     # different NN architectures with (number of layers, hidden layer sizes)
     if config.model_type == 'NN':
-        architectures = [(2, [[]]), (3, [[16], [8]]), (4, [[8,4], [8,8], [12,6], [12,12], [16,8], [16,16], [20,20]]), (5, [[16,12,8], [20,20,10], [16,16,16]])]
         architectures = [(2, [[]]), (3, [[16], [8]]), (4, [[8,4], [8,8], [12,6], [12,12], [16,8], [16,16], [20,20]])]
-        # architectures = [(4, [[8,4], [16,8], [16,16]]), (5, [[16,12,8], [16,16,16]])]
-        # architectures = [(5, [[16,16,16]])]
+        architectures = [(3, [[20], [40], [60], [92]]), (4, [[20,10], [30,15], [40,20], [60,30]]), (5, [[20,20,10], [30,30,10], [40,40,20], [50,50,50]])]
     else:
         architectures = [(None, [None])]
-    learning_rates = [0.001, 0.01, 0.1, 0.3]
+    learning_rates = [0.0001, 0.001, 0.01, 0.1]
     # learning_rates = [0.01]
-    l2_lambdas = [0.001, 0.01, 0.1]
+    l2_lambdas = [0.0001, 0.001, 0.01, 0.1]
 
     # loop over network architectures (not relevant for the LM)
     for num_layers, hidden_layer_sizes in architectures:
@@ -345,19 +389,68 @@ def hyper_param_optimization(train_set, train_labels):
         print(best_loss, best_epoch, best_lr, best_l2)
     return best_epoch, best_lr, best_l2, best_num_layers, best_hidden_layer_sizes
 
+def hyper_param_optimization(train_set, train_labels):
+    # we use 5-fold cross validation to find the best hyper parameters
+    data_folds = config.data_folds
+    train_set_folds, train_labels_folds = split_for_cross_validation(train_set, train_labels, k=data_folds)
+
+    num_features = len(train_set[0])
+    best_loss = 100000000
+    best_epoch = 0
+    best_lr = 0
+    best_l2 = 0
+
+    learning_rates = [0.001, 0.01, 0.1]
+    # learning_rates = [0.01]
+    l2_lambdas = [0.001, 0.01, 0.1]
+
+    # return 32, 0.01, 0.01, 4, [8,4]
+
+    # loop over hyper parameters
+    for lrs in learning_rates:
+        print('learning rate', lrs)
+        for l2 in l2_lambdas:
+            # iterate over the k folds for cross validation
+            test_lossess = []
+            for k in range(data_folds):
+                train_set_f, train_labels_f, validation_set_f, validation_labels_f = cross_validate(train_set_folds, train_labels_folds, k)
+                model, train_losses, test_losses = train_model(train_set_f, train_labels_f, validation_set_f, validation_labels_f, num_features, epochs = hyperparameters.epochs_contrastive, learning_rate=lrs, regularisation=l2)
+                test_lossess.append(test_losses)
+
+            # show_loss_plot(train_losses, test_losses, show=False, lr=lrs, l2=l2)
+            avg_test_losses = np.mean(test_lossess, axis=0)
+            # get minimum value and index
+            min_test_loss = np.amin(avg_test_losses)
+            min_index = np.argmin(avg_test_losses)
+            print(min_test_loss, min_index)
+
+            if min_test_loss < best_loss:
+                best_loss = min_test_loss
+                best_lr = lrs
+                best_l2 = l2
+                best_epoch = min_index
+            # plt.legend()
+            # plt.show()
+    if config.model_type == 'NN':
+        print(best_loss, best_epoch, best_lr, best_l2)
+    else:
+        print(best_loss, best_epoch, best_lr, best_l2)
+    return best_epoch, best_lr, best_l2
+
 if __name__ == '__main__':
-    folder_path = 'datasets\\100random\\100'
+    folder_path = 'datasets\\1000mcts\\1000'
+    print(folder_path, config.model_type)
 
     # if there is an argument in the console
     if len(sys.argv) > 1:
         folder_path = sys.argv[1]
 
-    path_org_cte = folder_path + '\org_features.pkl'
-    path_cf_cte = folder_path + '\cf_features.pkl'
+    path_org_cte = folder_path + '\org_features_new.pkl'
+    path_cf_cte = folder_path + '\cf_features_new.pkl'
 
     # training_numbers = [5,10,20,50, 100, 200, 500, 800]
     # for n_train in training_numbers:
         # print(n_train)
         # learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=n_train)
 
-    learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=80)
+    learning_repeats(path_org_cte, path_cf_cte, folder_path, contrastive=True, baseline=0, n_train=800)

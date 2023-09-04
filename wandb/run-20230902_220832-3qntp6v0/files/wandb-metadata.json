@@ -1,0 +1,22 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.9.1",
+    "heartbeatAt": "2023-09-02T20:08:38.546216",
+    "startedAt": "2023-09-02T20:08:32.778208",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "C:\\Users\\janwe\\OneDrive\\Desktop\\Master_Thesis\\Other_projects\\moral_rl\\moral\\airl_train.py",
+    "codePath": "moral\\airl_train.py",
+    "git": {
+        "remote": "https://github.com/TheGermanCodeMachine/moral_rl",
+        "commit": "d91e88797b6efb9829cd8a65aefdfcdfb2ff7996"
+    },
+    "email": "janwehner1@t-online.de",
+    "root": "C:/Users/janwe/OneDrive/Desktop/Master_Thesis/Other_projects/moral_rl",
+    "host": "LAPTOP-N3U8D05G",
+    "username": "janwe",
+    "executable": "C:\\Users\\janwe\\AppData\\Local\\Programs\\Python\\Python39\\python.exe"
+}

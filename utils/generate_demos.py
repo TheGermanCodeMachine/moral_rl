@@ -15,7 +15,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 env_id = 'randomized_v2'
 
 # Select n demos (need to set timer separately)
-n_demos = 50
+n_demos = 1000
 max_steps = 75
 
 # Initialize Environment
@@ -34,7 +34,7 @@ in_channels = obs_shape[-1]
 
 # Load Pretrained PPO
 ppo = PPO(state_shape=state_shape, n_actions=n_actions, in_channels=in_channels).to(device)
-ppo.load_state_dict(torch.load('saved_models\ppo_v2_[1, 10].pt'))
+ppo.load_state_dict(torch.load('saved_models\\tmp\ppo_v2_[1, 10]tmp_80000.pt'))
 
 
 for t in tqdm(range((max_steps-1)*n_demos)):
@@ -53,4 +53,4 @@ for t in tqdm(range((max_steps-1)*n_demos)):
     states = next_states.copy()
     states_tensor = torch.tensor(states).float().to(device)
 
-pickle.dump(dataset, open('demonstrations\ppo_demos_v2_75_[1,10]' + '.pk', 'wb'))
+pickle.dump(dataset, open('demonstrations\ppo_demos_v2_75_[1,10]_1000' + '.pk', 'wb'))

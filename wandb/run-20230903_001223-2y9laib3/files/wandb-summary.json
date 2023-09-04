@@ -1,0 +1,1 @@
+{"Obj_0": 0.016666666666666666, "_timestamp": 1693693329, "_runtime": 586, "_step": 2294, "Obj_1": 6.416666666666667, "True Return": 64.18333333333334, "Discriminator Loss": 0.45303449034690857, "Fake Accuracy": 0.73046875, "Real Accuracy": 0.78125, "avg_airl_reward": -172.79062557592988, "AIRL Returns": -187.48600181937218, "_wandb": {"runtime": 583}}

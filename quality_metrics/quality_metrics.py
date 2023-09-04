@@ -21,6 +21,7 @@ from quality_metrics.sparsity_measure import sparsitiy_single_partial
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 import pickle
+from helpers.util_functions import normalise_value, normalise_values
 
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
 with open('interpretability\\normalisation_values.pkl', 'rb') as f:
@@ -42,7 +43,7 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
     qc_values = [(x, 0) for x in range(len(counterfactual_rewards)+1)]
     if 'validity' in criteria_to_use:
         validity_qc_abs = validity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
-        validity_qc = normalise_values_01(validity_qc_abs)
+        validity_qc = normalise_values(validity_qc_abs, normalisation, 'validity')
         # ax.plot(xx, validity_qc, 'ro', label='validity')
         # multiply by weight
         validity_qc = [val * weight['validity'] for val in validity_qc]
@@ -52,32 +53,32 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
         proximity_qc_abs = distance(org_traj, counterfactual_trajs, starts, end_cfs,end_orgs)
         # take the log to make the distibution more concave
         proximity_qc = np.log(proximity_qc_abs)
-        proximity_qc = normalise_values_01(proximity_qc)
+        proximity_qc = normalise_values(proximity_qc, normalisation, 'proximity')
         # ax.plot(xx, [-i for i in proximity_qc], 'go', label='proximity')
         proximity_qc = [val * weight['proximity'] for val in proximity_qc]
         qc_values = [(x, qc_values[x][1] - proximity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'critical_state' in criteria_to_use:
         critical_state_qc_abs = critical_state(ppo, [counterfactual_traj['states'][starts[i]] for i, counterfactual_traj in enumerate(counterfactual_trajs)])
-        critical_state_qc = normalise_values_01(critical_state_qc_abs)
+        critical_state_qc = normalise_values(critical_state_qc_abs, normalisation, 'critical_state')
         # ax.plot(xx, critical_state_qc, 'bo', label='critical_state')
         critical_state_qc = [val * weight['critical_state'] for val in critical_state_qc]
         qc_values = [(x, qc_values[x][1] + critical_state_qc[x]) for x in range(len(counterfactual_rewards))]
     # IN THIS VERSION OF DIVERSITY WE COMPUTE DIVERSITY FOR ALL COUNTERFACTUALS, WHICH TAKES MORE TIME
     if 'diversity' in criteria_to_use:
         diversity_qc_abs = diversity(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs, all_org_trajs, all_cf_trajs, all_starts)
-        diversity_qc = normalise_values_01(diversity_qc_abs)
+        diversity_qc = normalise_values(diversity_qc_abs, normalisation, 'diversity')
         # ax.plot(xx, diversity_qc, 'yo', label='diversity')
         diversity_qc = [val * weight['diversity'] for val in diversity_qc]
         qc_values = [(x, qc_values[x][1] + diversity_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'realisticness' in criteria_to_use:
         realisticness_qc_abs = realisticness(org_traj, counterfactual_trajs, starts, end_cfs, end_orgs)
-        realisticness_qc = normalise_values_01(realisticness_qc_abs)
+        realisticness_qc = normalise_values(realisticness_qc_abs, normalisation, 'realisticness')
         # ax.plot(xx, realisticness_qc, 'co', label='realisticness')
         realisticness_qc = [val * weight['realisticness'] for val in realisticness_qc]
         qc_values = [(x, qc_values[x][1] + realisticness_qc[x]) for x in range(len(counterfactual_rewards))]
     if 'sparsity' in criteria_to_use:
         sparsity_qc_abs = sparsity(starts, end_cfs, end_orgs)
-        sparsity_qc = normalise_values_01(sparsity_qc_abs)
+        sparsity_qc = normalise_values(sparsity_qc_abs, normalisation, 'sparsity')
         # ax.plot(xx, sparsity_qc, 'mo', label='sparsity')
         sparsity_qc = [val * weight['sparsity'] for val in sparsity_qc]
         qc_values = [(x, qc_values[x][1] + sparsity_qc[x]) for x in range(len(counterfactual_rewards))]
@@ -212,24 +213,27 @@ def measure_quality(org_traj, counterfactual_trajs, counterfactual_rewards, star
 # this function gives the evaluation for trajectories created with the mcts method.
 # It does not take into account critical state and diversity
 # It gives rewards for only 1 trajectory at a time, thus normalising is done beforehand by sampling random trajectories and evaluating the qc metrics on them
-def evaluate_qc(org_traj, cf_traj, criteria_to_use):
+def evaluate_qc(org_traj, cf_traj, start, criteria_to_use, prev_org_trajs, prev_cf_trajs, prev_starts):
     qc_value = 0
     if 'proximity' in criteria_to_use:
         proximity_qc = distance_subtrajectories(org_traj, cf_traj)
-        proximity_qc = proximity_qc * normalisation['proximity'] * weight['validity']
+        proximity_qc = normalise_value(proximity_qc, normalisation, 'proximity') * weight['validity']
         qc_value -= proximity_qc
     if 'validity' in criteria_to_use:
         validity_qc = validity_single_partial(org_traj, cf_traj)
-        validity_qc = validity_qc * normalisation['validity'] * weight['proximity']
+        validity_qc = normalise_value(validity_qc, normalisation, 'validity') * weight['proximity']
         qc_value += validity_qc
     if 'sparsity' in criteria_to_use:
         sparsity_qc = sparsitiy_single_partial(org_traj, cf_traj)
-        sparsity_qc = sparsity_qc * normalisation['sparsity'] * weight['sparsity']
+        sparsity_qc = normalise_value(sparsity_qc, normalisation, 'sparsity') * weight['sparsity']
         qc_value += sparsity_qc
     if 'realisticness' in criteria_to_use:
         realisticness_qc = realisticness_single_partial(org_traj, cf_traj)
-        realisticness_qc = realisticness_qc * normalisation['realisticness'] * weight['realisticness']
+        realisticness_qc = normalise_value(realisticness_qc, normalisation, 'realisticness') * weight['realisticness']
         qc_value += realisticness_qc
+    if 'diversity' in criteria_to_use:
+        diversity_qc = diversity_single(org_traj, cf_traj, start, prev_org_trajs, prev_cf_trajs, prev_starts)
+        qc_value += normalise_value(diversity_qc, normalisation, 'diversity') * weight['diversity']
     return qc_value
 
 def compare_cte_methods(org_mcts, cf_mcts, start_mcts, prev_org_trajs, prev_cf_trajs, prev_starts, criteria_to_use, ppo, org_step=None, cf_step=None, start_step=None, org_random=None, cf_random=None, start_random=None):
@@ -238,68 +242,68 @@ def compare_cte_methods(org_mcts, cf_mcts, start_mcts, prev_org_trajs, prev_cf_t
     qc_random = 0
     if 'proximity' in criteria_to_use:
         prox_mcts = distance_subtrajectories(org_mcts, cf_mcts)
-        qc_mcts -= prox_mcts * normalisation['proximity'] * weight['proximity']
+        qc_mcts -= normalise_value(prox_mcts, normalisation, 'proximity') * weight['proximity']
         if org_step:
             prox_step = distance_subtrajectories(org_step, cf_step)
             prox_random = distance_subtrajectories(org_random, cf_random)
             print('proximity:', round(prox_mcts, 2), round(prox_step, 2), round(prox_random, 2))
-            qc_step -= prox_step * normalisation['proximity'] * weight['proximity']
-            qc_random -= prox_random * normalisation['proximity'] * weight['proximity']
+            qc_step -= normalise_value(prox_step, normalisation, 'proximity') * weight['proximity']
+            qc_random -= normalise_value(prox_random, normalisation, 'proximity') * weight['proximity']
         else:
             print('proximity:', round(prox_mcts, 2))
     if 'validity' in criteria_to_use:
         val_mcts = validity_single_partial(org_mcts, cf_mcts)
-        qc_mcts += val_mcts * normalisation['validity'] * weight['validity']
+        qc_mcts += normalise_value(val_mcts, normalisation, 'validity') * weight['validity']
         if org_step:
             val_step = validity_single_partial(org_step, cf_step)
             val_random = validity_single_partial(org_random, cf_random)
             print('validity:', round(val_mcts, 2), round(val_step, 2), round(val_random, 2))
-            qc_step += val_step * normalisation['validity'] * weight['validity']
-            qc_random += val_random * normalisation['validity'] * weight['validity']
+            qc_step += normalise_value(val_step, normalisation, 'validity') * weight['validity']
+            qc_random += normalise_value(val_random, normalisation, 'validity') * weight['validity']
         else:
             print('validity:', round(val_mcts, 2))
     if 'sparsity' in criteria_to_use:
         spar_mcts = sparsitiy_single_partial(org_mcts, cf_mcts)
-        qc_mcts += spar_mcts * normalisation['sparsity'] * weight['sparsity']
+        qc_mcts += normalise_value(spar_mcts, normalisation, 'sparsity') * weight['sparsity']
         if org_step:
             spar_step = sparsitiy_single_partial(org_step, cf_step)
             spar_random = sparsitiy_single_partial(org_random, cf_random)
             print('sparsity:', round(spar_mcts, 2), round(spar_step, 2), round(spar_random, 2))        
-            qc_step += spar_step * normalisation['sparsity'] * weight['sparsity']
-            qc_random += spar_random * normalisation['sparsity'] * weight['sparsity']
+            qc_step += normalise_value(spar_step, normalisation, 'sparsity') * weight['sparsity']
+            qc_random += normalise_value(spar_random, normalisation, 'sparsity') * weight['sparsity']
         else:
             print('sparsity:', round(spar_mcts, 2))
     if 'realisticness' in criteria_to_use:
         real_mcts = realisticness_single_partial(org_mcts, cf_mcts)
-        qc_mcts += real_mcts * normalisation['realisticness'] * weight['realisticness']
+        qc_mcts += normalise_value(real_mcts, normalisation, 'realisticness') * weight['realisticness']
         if org_step:
             real_step = realisticness_single_partial(org_step, cf_step)
             real_random = realisticness_single_partial(org_random, cf_random)
             print('realisticness:', round(real_mcts, 2), round(real_step, 2), round(real_random, 2))
-            qc_step += real_step * normalisation['realisticness'] * weight['realisticness']
-            qc_random += real_random * normalisation['realisticness'] * weight['realisticness']
+            qc_step += normalise_value(real_step, normalisation, 'realisticness') * weight['realisticness']
+            qc_random += normalise_value(real_random, normalisation, 'realisticness') * weight['realisticness']
         else:
             print('realisticness:', round(real_mcts, 2))
     if 'diversity' in criteria_to_use:
         div_mcts = diversity_single(org_mcts, cf_mcts, start_mcts, prev_org_trajs, prev_cf_trajs, prev_starts)
-        qc_mcts += div_mcts * normalisation['diversity'] * weight['diversity']
+        qc_mcts += normalise_value(div_mcts, normalisation, 'diversity') * weight['diversity']
         if org_step:
             div_step = diversity_single(org_step, cf_step, start_step, prev_org_trajs, prev_cf_trajs, prev_starts)
             div_random = diversity_single(org_random, cf_random, start_random, prev_org_trajs, prev_cf_trajs, prev_starts)
             print('diversity:', round(div_mcts, 2), round(div_step, 2), round(div_random, 2))
-            qc_step += div_step * normalisation['diversity'] * weight['diversity']
-            qc_random += div_random * normalisation['diversity'] * weight['diversity']
+            qc_step += normalise_value(div_step, normalisation, 'diversity') * weight['diversity']
+            qc_random += normalise_value(div_random, normalisation, 'diversity') * weight['diversity']
         else:
             print('diversity:', round(div_mcts, 2))
     if 'critical_state' in criteria_to_use:
         crit_mcts = critical_state_single(ppo, org_mcts['states'][0])
-        qc_mcts += crit_mcts * normalisation['critical_state'] * weight['critical_state']
+        qc_mcts += normalise_value(crit_mcts, normalisation, 'critical_state') * weight['critical_state']
         if org_step:
             crit_step = critical_state_single(ppo, org_step['states'][0])
             crit_random = critical_state_single(ppo, org_random['states'][0])
             print('critical_state:', round(crit_mcts, 2), round(crit_step, 2), round(crit_random, 2))
-            qc_step += crit_step * normalisation['critical_state'] * weight['critical_state']
-            qc_random += crit_random * normalisation['critical_state'] * weight['critical_state']
+            qc_step += normalise_value(crit_step, normalisation, 'critical_state') * weight['critical_state']
+            qc_random += normalise_value(crit_random, normalisation, 'critical_state') * weight['critical_state']
         else:
             print('critical_state:', round(crit_mcts, 2))
 

@@ -7,7 +7,7 @@ from envs.gym_wrapper import *
 import torch
 from helpers.util_functions import *
 
-def generate_counterfactuals(org_traj, ppo, discriminator, seed_env, config):
+def generate_counterfactual_step(org_traj, ppo, discriminator, seed_env, config):
     # Now we make counterfactual trajectories by changing one action at a time and see how the reward changes
 
     # we make copies of the original trajectory and each changes one action at a timestep step

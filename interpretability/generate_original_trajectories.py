@@ -32,7 +32,7 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    num_runs = 1000
+    num_runs = 50
 
 def generate_original_trajectory(ppo, discriminator, vec_env, states_tensor):
      # create one trajectory with ppo
@@ -78,10 +78,10 @@ if __name__ == '__main__':
     print('Initializing and Normalizing Rewards...')
     ppo = PPO(state_shape=state_shape, in_channels=in_channels, n_actions=n_actions).to(device)
     optimizer = torch.optim.Adam(ppo.parameters(), lr=config.lr_ppo)
-    ppo.load_state_dict(torch.load('saved_models\ppo_airl_v2_[1,10].pt', map_location=torch.device('cpu')))
+    ppo.load_state_dict(torch.load('saved_models\ppo_airl_v2_[1,10]_new.pt', map_location=torch.device('cpu')))
 
     discriminator = DiscriminatorMLP(state_shape=state_shape, in_channels=in_channels).to(device)
-    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10].pt', map_location=torch.device('cpu')))
+    discriminator.load_state_dict(torch.load('saved_models/discriminator_v2_[1,10]_new.pt', map_location=torch.device('cpu')))
 
     original_trajectories_and_seeds = []
 
@@ -99,5 +99,5 @@ if __name__ == '__main__':
         original_trajectories_and_seeds.append((org_traj, seed_env))
 
     # save the original trajectories
-    with open('demonstrations/original_trajectories_new_maxsteps75_airl_1000.pkl', 'wb') as f:
+    with open('demonstrations/original_trajectories_new_maxsteps75_airl_50_new.pkl', 'wb') as f:
         pickle.dump(original_trajectories_and_seeds, f)

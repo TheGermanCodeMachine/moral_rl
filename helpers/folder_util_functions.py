@@ -9,7 +9,7 @@ def iterate_through_folder(folder_path):
         all_folder_base_paths = []
         for subfolder in subfolders:
             # subfolder shouldn't be called results
-            if not subfolder.endswith('results') and not subfolder.endswith('statistics'):
+            if not 'results' in subfolder and not subfolder.endswith('statistics'):
                 subsubfolders = iterate_through_folder(subfolder)
                 all_folder_base_paths.extend(subsubfolders)
             else:
