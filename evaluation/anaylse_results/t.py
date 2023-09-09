@@ -10,7 +10,7 @@ import os
 from quality_metrics.diversity_measures import diversity_single
 
 weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
-with open('interpretability\\normalisation_values.pkl', 'rb') as f:
+with open('interpretability\\normalisation_values_new.pkl', 'rb') as f:
     normalisation = pkl.load(f)
 
 

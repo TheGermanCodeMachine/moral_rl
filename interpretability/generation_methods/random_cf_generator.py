@@ -116,10 +116,9 @@ if __name__ == '__main__':
         all_part_orgs.append((random_org, random_rewards))
         random_rewards_cf = sum(random_cf['rewards'])
         all_part_cfs.append((random_cf, random_rewards_cf))
+        all_starts.append(random_start)
 
 
     #save the trajectories
-    with open('datasets\\10000random\\10000' + '\org_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_part_orgs, f)
-    with open('datasets\\10000random\\10000' + '\cf_trajectories.pkl', 'wb') as f:
-        pickle.dump(all_part_cfs, f)
+    with open('datasets\\1000random\\1000' + '\\statistics\\start_points.pkl', 'wb') as f:
+        pickle.dump(all_starts, f)

@@ -37,6 +37,8 @@ def normalise_features(values):
         return values.tolist()
     mean = np.mean(values)
     std = np.std(values)
+    if std == 0:
+        return values.tolist()
     normalised_values = ((values - mean) / std).tolist()
     return  normalised_values
 

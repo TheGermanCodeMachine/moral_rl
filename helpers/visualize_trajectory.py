@@ -18,7 +18,12 @@ TYPE_TO_STRING = {0: {"letter": "#", "color": Back.BLACK},  # Walls.
                         6: {"letter": "H", "color": Back.CYAN}}  # House.
 
 def action_to_gray_position(action, state):
-    if action[0] in {5,6,7,8}:
+    #check if action is a numpy array
+    if isinstance(action, np.ndarray):
+        action = action[0].item()
+    else:
+        action = action[0]
+    if action in {5,6,7,8}:
         x,y = extract_player_position(state)
         if action == 5: #up
             return x-1, y
@@ -127,8 +132,8 @@ def visualize_two_part_trajectories_part(org_traj, cf_traj):
         print('\033c')
         print('Step: {}'.format(i))
         # print the steps and rewards in one line
-        print('Reward this step - orginial: {} -counterfactual: {}'.format(org_traj['rewards'][i_org], cf_traj['rewards'][i_cf]))
-        print('Total reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'])/len(org_traj['states']), sum(cf_traj['rewards'])/len(cf_traj['states'])))
+        # print('Reward this step - orginial: {} -counterfactual: {}'.format(org_traj['rewards'][i_org], cf_traj['rewards'][i_cf]))
+        print('Average reward - original {} - counterfactual {}'.format(sum(org_traj['rewards'])/len(org_traj['states']), sum(cf_traj['rewards'])/len(cf_traj['states'])))
         print('Original Trajectory      Counterfactual Trajectory')
         if i == 0:
             paint_two_states(org_traj['states'][i_org], cf_traj['states'][i_cf])

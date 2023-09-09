@@ -255,7 +255,7 @@ def calulate_PCA(org_features):
     return explained_variance
 
 if __name__ == '__main__':
-    folder_path = 'datasets\\1000mcts\\1000'
+    folder_path = 'datasets\\1000_ablations\weights\\set5\\100'
 
     all_folder_base_paths = iterate_through_folder(folder_path)
     all_folder_base_paths.reverse()

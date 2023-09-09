@@ -235,4 +235,4 @@ def analyse_num_data():
     plt.show()
 
 
-analyse_num_data()
+analyse_task_weights()

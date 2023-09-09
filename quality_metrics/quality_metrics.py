@@ -23,8 +23,9 @@ from scipy.stats import pearsonr, spearmanr
 import pickle
 from helpers.util_functions import normalise_value, normalise_values
 
-weight = {'validity': 1, 'proximity': 1, 'critical_state': 0.5, 'diversity': 0.5, 'realisticness': 0.2, 'sparsity': 0.5}
-with open('interpretability\\normalisation_values.pkl', 'rb') as f:
+weight = {'validity': 1, 'proximity': 1, 'critical_state': 1, 'diversity': 1, 'realisticness': 1, 'sparsity': 0}
+# weight = {'validity': 2, 'proximity': 1, 'critical_state': 0.5, 'diversity': 3, 'realisticness': 0.3, 'sparsity': 0.3}
+with open('interpretability\\normalisation_values_new.pkl', 'rb') as f:
     normalisation = pickle.load(f)
 
 def evaluate_qcs_for_cte(org_traj, counterfactual_traj, start, ppo, all_org_trajs, all_cf_trajs, all_starts):

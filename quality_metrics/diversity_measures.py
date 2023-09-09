@@ -84,8 +84,6 @@ def diversity_all(org_traj, cf_trajs, starts, end_cfs, end_orgs, prev_org_trajs,
     return sum
 
 def diversity_single(org_traj, cf_traj, start, prev_org_trajs, prev_cf_trajs, prev_starts):
-    # BUG: This is not normalised in the same way as the diversity_all function. THus it leads to different results.
-    # TODO: Fix this
     if len(prev_starts) == 0:
         return 0
     iterate_prev = range(len(prev_starts))

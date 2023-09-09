@@ -8,7 +8,7 @@ from quality_metrics.quality_metrics import weight
 import pickle
 from helpers.util_functions import normalise_value
 
-with open('interpretability\\normalisation_values.pkl', 'rb') as f:
+with open('interpretability\\normalisation_values_new.pkl', 'rb') as f:
     normalisation = pickle.load(f)
 
 mcts_prox, step_prox, random_prox = [], [], []

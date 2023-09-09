@@ -45,9 +45,9 @@ class config:
     epsilon= 0.1
     ppo_epochs= 5
     max_steps = 75
-    base_path = '.\datasets\\1000mcts\\'
+    base_path = '.\datasets\\1000mcts\\1000\\'
     measure_statistics = True
-    num_runs = 50
+    num_runs = 1000
     criteria = ['validity', 'diversity', 'proximity', 'critical_state', 'realisticness', 'sparsity']
     # criteria = ['baseline']
     # criteria = ['validity']
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     lengths_org, lengths_cf, start_points, quality_criteria, effiencies, qc_statistics = [], [], [], [], [], []
 
     # load the original trajectories
-    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_50_new.pkl', 'rb'))
+    org_traj_seed = pickle.load(open('demonstrations/original_trajectories_new_maxsteps75_airl_1000_new.pkl', 'rb'))
 
     # normalising_qcs(ppo, discriminator, org_traj_seed, config)
 
@@ -108,6 +108,9 @@ if __name__ == '__main__':
     run = 0
     for org_traj, seed_env in org_traj_seed:
         print(run)
+        if run <= 300:
+            run += 1
+            continue
         if run >= config.num_runs: break
         run += 1
 
@@ -119,7 +122,7 @@ if __name__ == '__main__':
                 # Method 1: MCTS            
                 traj_org, traj_cf, traj_start = generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, all_org_trajs, all_cf_trajs, all_starts, config)
                 efficiency = time.time() - time_start
-                # visualize_two_part_trajectories_part(traj_org, traj_cf)
+                visualize_two_part_trajectories_part(traj_org, traj_cf)
 
 
                 mcts_rewards = sum(traj_org['rewards'])
@@ -128,23 +131,23 @@ if __name__ == '__main__':
                 all_part_cfs.append((traj_cf, mcts_rewards_cf))
 
                 # append this to 'datasets\1000mcts\1000\cf_trajectories_tmp.pkl'
-                try:
-                    with open('datasets\\1000mcts\\1000\cf_trajectories_tmp2.pkl', 'rb') as f:
-                        data = pickle.load(f)
-                except:
-                    data = []
-                data.append((traj_cf, mcts_rewards_cf))
-                with open('datasets\\1000mcts\\1000\cf_trajectories_tmp2.pkl', 'wb') as f:
-                    pickle.dump(data, f)
-                try:
-                    with open('datasets\\1000mcts\\1000\org_trajectories_tmp2.pkl', 'rb') as f:
-                        data = pickle.load(f)
-                except:
-                    data = []
-                data.append((traj_org, mcts_rewards))
-                print(len(data))
-                with open('datasets\\1000mcts\\1000\org_trajectories_tmp2.pkl', 'wb') as f:
-                    pickle.dump(data, f)
+                # try:
+                #     with open('datasets\\1000mcts\\1000\cf_trajectories_tmp2.pkl', 'rb') as f:
+                #         data = pickle.load(f)
+                # except:
+                #     data = []
+                # data.append((traj_cf, mcts_rewards_cf))
+                # with open('datasets\\1000mcts\\1000\cf_trajectories_tmp2.pkl', 'wb') as f:
+                #     pickle.dump(data, f)
+                # try:
+                #     with open('datasets\\1000mcts\\1000\org_trajectories_tmp2.pkl', 'rb') as f:
+                #         data = pickle.load(f)
+                # except:
+                #     data = []
+                # data.append((traj_org, mcts_rewards))
+                # print(len(data))
+                # with open('datasets\\1000mcts\\1000\org_trajectories_tmp2.pkl', 'wb') as f:
+                #     pickle.dump(data, f)
 
             if config.cf_method == 'step':
                 # Method 2: 1-step deviation

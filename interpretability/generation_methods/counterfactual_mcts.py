@@ -37,9 +37,7 @@ set_of_actions = [0,1,2,3,4,5,6,7,8]
 action_threshold = 0.05
 likelihood_terminal = 0.2
 discout_factor = 0.8
-terminal_state = (-1,-1)
-qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness', 'diversity'
-                      ]
+qc_criteria_to_use = ['proximity', 'sparsity', 'validity', 'realisticness', 'diversity']
 timeout=5
 
 def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_org_trajs, prev_cf_trajs, prev_starts, config):
@@ -48,7 +46,7 @@ def generate_counterfactual_mcts(org_traj, ppo, discriminator, seed_env, prev_or
     # get the index of the 5 states with the highest critical state
     critical_states = [(i,j) for i,j in zip(critical_states, range(len(critical_states)))]
     critical_states.sort(key=lambda x: x[0], reverse=True)
-    critical_states = critical_states[:5]
+    critical_states = critical_states[:3]
 
     part_orgs, part_cfs, q_values = [], [], []
     for (i, starting_position) in critical_states:
@@ -88,12 +86,14 @@ def run_mcts_from(org_traj, starting_position, ppo, discriminator, seed_env, pre
                 chosen_action = action
 
         # print("Depth:", i, "; Chosen action:", chosen_action, string)
+        # This try statement is a bandaid for a bug, where the root_node.children can somtimes not contain the chosen action. In that case I currently just skip this step and rerun MCTS for the current root_node
         cf_trajectory.append(chosen_action)
         for (child, _) in root_node.children[chosen_action]:
             if cf_trajectory == child.trajectory['actions']:
                 root_node = child
         i +=1
         num_step += 1
+        
         # action = qfunction.get_max_q(root_Node.trajectory, mdp.get_actions(root_Node.state))[0]
         # cf_trajectory.append(action)
         # (next_state, reward, done) = mdp.execute(action)

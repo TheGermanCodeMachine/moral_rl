@@ -36,16 +36,16 @@ def normalising_qcs(ppo, discriminator, org_traj_seed, config):
         prev_cf_trajs.append(random_cf)
         prev_starts.append(random_start)
         num += 1
-        if num == 20:
+        if num == 10:
             break
     
     num = 0
     prev_org_trajs, prev_cf_trajs, prev_starts = [], [], []
     for org_traj, seed_env in org_traj_seed:
-        if num < 20:
+        if num < 10:
             num += 1
             continue
-        if num == 40:
+        if num == 20:
             break
         print(num)
         num+=1
@@ -69,6 +69,7 @@ def normalising_qcs(ppo, discriminator, org_traj_seed, config):
         reals.append(realisticness_single_partial(step_org, step_cf))
 
     normalisation = {'validity': [min(vals), max(vals)], 'diversity': [min(divs), max(divs)], 'proximity': [min(proxs), max(proxs)], 'critical_state': [min(crits), max(crits)], 'realisticness': [min(reals), max(reals)], 'sparsity': [min(spars), max(spars)]}
+    print(normalisation)
     # write into pickle
-    with open('interpretability\\normalisation_values.pkl', 'wb') as f:
+    with open('interpretability\\normalisation_values_new.pkl', 'wb') as f:
         pickle.dump(normalisation, f)
